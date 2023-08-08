@@ -1,0 +1,131 @@
+From 2ea983105e69f0d8daa7b5e8ea1bcf8fb8ecaea3 Mon Sep 17 00:00:00 2001
+From: Mathieu Malaterre <mathieu.malaterre@gmail.com>
+Date: Tue, 17 Jan 2023 11:33:20 +0100
+Subject: [PATCH] Generate and install a HWYConfig.cmake file
+
+This will be needed by cmake user consuming HWY.
+
+Also remove FindHWY.cmake since not needed in a cmake-based build tool
+setup.
+
+Fixes #1114
+---
+ CMakeLists.txt | 12 ++++++---
+ FindHWY.cmake  | 66 --------------------------------------------------
+ 2 files changed, 9 insertions(+), 69 deletions(-)
+ delete mode 100644 FindHWY.cmake
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e01990b6..c239ef75 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -366,7 +366,7 @@ endif()
+ # -------------------------------------------------------- install library
+ if (HWY_ENABLE_INSTALL)
+ 
+-install(TARGETS hwy
++install(TARGETS hwy EXPORT hwy_targets
+   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+@@ -381,7 +381,7 @@ foreach (source ${HWY_SOURCES})
+ endforeach()
+ 
+ if (HWY_ENABLE_CONTRIB)
+-install(TARGETS hwy_contrib
++install(TARGETS hwy_contrib EXPORT hwy_targets
+   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+@@ -396,7 +396,7 @@ foreach (source ${HWY_CONTRIB_SOURCES})
+ endforeach()
+ endif()  # HWY_ENABLE_CONTRIB
+ 
+-install(TARGETS hwy_test
++install(TARGETS hwy_test EXPORT hwy_targets
+   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+@@ -571,3 +571,9 @@ endforeach ()
+ target_sources(skeleton_test PRIVATE hwy/examples/skeleton.cc)
+ 
+ endif()  # BUILD_TESTING
++
++# write HWYConfig file:
++include(CMakePackageConfigHelpers)
++write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/HWYConfigVersion.cmake" COMPATIBILITY SameMajorVersion)
++install(FILES "${CMAKE_CURRENT_BINARY_DIR}/HWYConfigVersion.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/hwy")
++install(EXPORT hwy_targets FILE HWYConfig.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/hwy")
+diff --git a/FindHWY.cmake b/FindHWY.cmake
+deleted file mode 100644
+index 271fbc8e..00000000
+--- a/FindHWY.cmake
++++ /dev/null
+@@ -1,66 +0,0 @@
+-# Copyright (c) the JPEG XL Project Authors. All rights reserved.
+-#
+-# Use of this source code is governed by a BSD-style license that can be
+-# found in https://github.com/libjxl/libjxl/blob/main/LICENSE.
+-
+-find_package(PkgConfig QUIET)
+-if (PkgConfig_FOUND)
+-  pkg_check_modules(PC_HWY QUIET libhwy)
+-  set(HWY_VERSION ${PC_HWY_VERSION})
+-endif ()
+-
+-find_path(HWY_INCLUDE_DIR
+-  NAMES hwy/highway.h
+-  HINTS ${PC_HWY_INCLUDEDIR} ${PC_HWY_INCLUDE_DIRS}
+-)
+-
+-find_library(HWY_LIBRARY
+-  NAMES ${HWY_NAMES} hwy
+-  HINTS ${PC_HWY_LIBDIR} ${PC_HWY_LIBRARY_DIRS}
+-)
+-
+-if (HWY_INCLUDE_DIR AND NOT HWY_VERSION)
+-  if (EXISTS "${HWY_INCLUDE_DIR}/hwy/highway.h")
+-    file(READ "${HWY_INCLUDE_DIR}/hwy/highway.h" HWY_VERSION_CONTENT)
+-
+-    string(REGEX MATCH "#define HWY_MAJOR +([0-9]+)" _dummy "${HWY_VERSION_CONTENT}")
+-    set(HWY_VERSION_MAJOR "${CMAKE_MATCH_1}")
+-
+-    string(REGEX MATCH "#define +HWY_MINOR +([0-9]+)" _dummy "${HWY_VERSION_CONTENT}")
+-    set(HWY_VERSION_MINOR "${CMAKE_MATCH_1}")
+-
+-    string(REGEX MATCH "#define +HWY_PATCH +([0-9]+)" _dummy "${HWY_VERSION_CONTENT}")
+-    set(HWY_VERSION_PATCH "${CMAKE_MATCH_1}")
+-
+-    set(HWY_VERSION "${HWY_VERSION_MAJOR}.${HWY_VERSION_MINOR}.${HWY_VERSION_PATCH}")
+-  endif ()
+-endif ()
+-
+-include(FindPackageHandleStandardArgs)
+-find_package_handle_standard_args(HWY
+-  FOUND_VAR HWY_FOUND
+-  REQUIRED_VARS HWY_LIBRARY HWY_INCLUDE_DIR
+-  VERSION_VAR HWY_VERSION
+-)
+-
+-if (HWY_LIBRARY AND NOT TARGET hwy)
+-  add_library(hwy INTERFACE IMPORTED GLOBAL)
+-
+-  if(CMAKE_VERSION VERSION_LESS "3.13.5")
+-    set_property(TARGET hwy PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${HWY_INCLUDE_DIR})
+-    target_link_libraries(hwy INTERFACE ${HWY_LIBRARY})
+-    set_property(TARGET hwy PROPERTY INTERFACE_COMPILE_OPTIONS ${PC_HWY_CFLAGS_OTHER})
+-  else()
+-    target_include_directories(hwy INTERFACE ${HWY_INCLUDE_DIR})
+-    target_link_libraries(hwy INTERFACE ${HWY_LIBRARY})
+-    target_link_options(hwy INTERFACE ${PC_HWY_LDFLAGS_OTHER})
+-    target_compile_options(hwy INTERFACE ${PC_HWY_CFLAGS_OTHER})
+-  endif()
+-endif()
+-
+-mark_as_advanced(HWY_INCLUDE_DIR HWY_LIBRARY)
+-
+-if (HWY_FOUND)
+-    set(HWY_LIBRARIES ${HWY_LIBRARY})
+-    set(HWY_INCLUDE_DIRS ${HWY_INCLUDE_DIR})
+-endif ()
+\ No newline at end of file

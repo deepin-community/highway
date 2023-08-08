@@ -1,0 +1,22 @@
+From 06ea5ed21d28e2873dc8c80db2c8d03d047bed1c Mon Sep 17 00:00:00 2001
+From: John Platts <john_platts@hotmail.com>
+Date: Fri, 27 Jan 2023 11:26:16 -0600
+Subject: [PATCH] Fixed HWY_SCALAR BitCast to copy only sizeof(T) bytes
+
+---
+ hwy/ops/scalar-inl.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/hwy/ops/scalar-inl.h b/hwy/ops/scalar-inl.h
+index c28f7b51..eeb1b6ae 100644
+--- a/hwy/ops/scalar-inl.h
++++ b/hwy/ops/scalar-inl.h
+@@ -93,7 +93,7 @@ template <typename T, typename FromT>
+ HWY_API Vec1<T> BitCast(Sisd<T> /* tag */, Vec1<FromT> v) {
+   static_assert(sizeof(T) <= sizeof(FromT), "Promoting is undefined");
+   T to;
+-  CopyBytes<sizeof(FromT)>(&v.raw, &to);  // not same size - ok to shrink
++  CopyBytes<sizeof(T)>(&v.raw, &to);  // not same size - ok to shrink
+   return Vec1<T>(to);
+ }
+ 
