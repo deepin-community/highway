@@ -1,0 +1,36 @@
+From fea3dba9cfec3a74ddcd8ecac3a5d4d8429191e4 Mon Sep 17 00:00:00 2001
+From: Mathieu Malaterre <mathieu.malaterre@gmail.com>
+Date: Wed, 13 Sep 2023 10:43:58 +0200
+Subject: [PATCH] Workaround issue on ppc64el with LTO
+
+Related to #1739
+---
+ hwy/contrib/math/math_test.cc | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/hwy/contrib/math/math_test.cc b/hwy/contrib/math/math_test.cc
+index ae4a961b7..6e218b8fe 100644
+--- a/hwy/contrib/math/math_test.cc
++++ b/hwy/contrib/math/math_test.cc
+@@ -161,8 +161,8 @@ HWY_NOINLINE void TestMath(const char* name, T (*fx1)(T),
+   DEFINE_MATH_TEST_FUNC(NAME)
+ 
+ // Floating point values closest to but less than 1.0
+-const float kNearOneF = BitCast<float>(0x3F7FFFFF);
+-const double kNearOneD = BitCast<double>(0x3FEFFFFFFFFFFFFFULL);
++float kNearOneF() { return BitCast<float>(0x3F7FFFFF); }
++double kNearOneD() { return BitCast<double>(0x3FEFFFFFFFFFFFFFULL); }
+ 
+ // The discrepancy is unacceptably large for MSYS2 (less accurate libm?), so
+ // only increase the error tolerance there.
+@@ -230,8 +230,8 @@ DEFINE_MATH_TEST(Atan,
+   std::atan,  CallAtan,  -FLT_MAX,   +FLT_MAX,    3,
+   std::atan,  CallAtan,  -DBL_MAX,   +DBL_MAX,    3)
+ DEFINE_MATH_TEST(Atanh,
+-  std::atanh, CallAtanh, -kNearOneF, +kNearOneF,  4,  // NEON is 4 instead of 3
+-  std::atanh, CallAtanh, -kNearOneD, +kNearOneD,  3)
++  std::atanh, CallAtanh, -kNearOneF(), +kNearOneF(),  4,  // NEON is 4 instead of 3
++  std::atanh, CallAtanh, -kNearOneD(), +kNearOneD(),  3)
+ DEFINE_MATH_TEST(Cos,
+   std::cos,   CallCos,   -39000.0f,  +39000.0f,   3,
+   std::cos,   CallCos,   -39000.0,   +39000.0,    Cos64ULP())

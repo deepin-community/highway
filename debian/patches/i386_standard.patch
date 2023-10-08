@@ -1,0 +1,27 @@
+Description: Run math_test on x87
+Author: Mathieu Malaterre <malat@debian.org>
+Forwarded: https://github.com/google/highway/issues/1708
+Last-Update: 2023-09-13
+
+--- highway-1.0.7.orig/hwy/contrib/math/math_test.cc
++++ highway-1.0.7/hwy/contrib/math/math_test.cc
+@@ -46,7 +46,7 @@ namespace HWY_NAMESPACE {
+ #if FLT_EVAL_METHOD == 0  // correct flag given, no problem
+ #define HWY_MATH_TEST_EXCESS_PRECISION 0
+ #else
+-#define HWY_MATH_TEST_EXCESS_PRECISION 1
++#define HWY_MATH_TEST_EXCESS_PRECISION 0
+ #pragma message( \
+     "Skipping scalar math_test on 32-bit x86 GCC 13+ without -fexcess-precision=standard")
+ #endif  // FLT_EVAL_METHOD
+@@ -68,6 +68,10 @@ namespace HWY_NAMESPACE {
+ #define HWY_MATH_TEST_EXCESS_PRECISION 0
+ #endif  // HWY_ARCH_X86_32 etc
+ 
++#if HWY_MATH_TEST_EXCESS_PRECISION == 1
++#error invalid setup
++#endif
++
+ template <class Out, class In>
+ inline Out BitCast(const In& in) {
+   static_assert(sizeof(Out) == sizeof(In), "");

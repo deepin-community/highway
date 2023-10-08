@@ -1,0 +1,9 @@
+Document: highway-doc
+Title: Highway Developer's Guide
+Author: Google
+Abstract: PDF documentation of Highway
+Section: Programming/C++
+
+Format: PDF
+Files: /usr/share/doc/highway-doc/highway_intro.pdf
+       /usr/share/doc/highway-doc/instruction_matrix.pdf

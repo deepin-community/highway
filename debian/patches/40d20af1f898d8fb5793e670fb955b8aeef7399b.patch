@@ -1,0 +1,84 @@
+From 40d20af1f898d8fb5793e670fb955b8aeef7399b Mon Sep 17 00:00:00 2001
+From: John Platts <john_platts@hotmail.com>
+Date: Tue, 29 Aug 2023 15:12:06 -0500
+Subject: [PATCH] Added fixes for float16_t/bfloat16_t operator++ and
+ operator--
+
+---
+ hwy/base.h | 28 ++++++++++++++++++++--------
+ 1 file changed, 20 insertions(+), 8 deletions(-)
+
+diff --git a/hwy/base.h b/hwy/base.h
+index 9d74f2b78..d18823479 100644
+--- a/hwy/base.h
++++ b/hwy/base.h
+@@ -449,24 +449,30 @@ struct float16_t {
+     return *this;
+   }
+ 
+-  float16_t operator--() noexcept {
++  // pre-decrement operator (--x)
++  float16_t& operator--() noexcept {
+     raw = static_cast<Raw>(raw - Raw{1});
+     return *this;
+   }
+ 
++  // post-decrement operator (x--)
+   float16_t operator--(int) noexcept {
++    float16_t result = *this;
+     raw = static_cast<Raw>(raw - Raw{1});
+-    return *this;
++    return result;
+   }
+ 
+-  float16_t operator++() noexcept {
++  // pre-increment operator (++x)
++  float16_t& operator++() noexcept {
+     raw = static_cast<Raw>(raw + Raw{1});
+     return *this;
+   }
+ 
++  // post-increment operator (x++)
+   float16_t operator++(int) noexcept {
++    float16_t result = *this;
+     raw = static_cast<Raw>(raw + Raw{1});
+-    return *this;
++    return result;
+   }
+ 
+   constexpr float16_t operator-() const noexcept {
+@@ -546,24 +552,30 @@ struct bfloat16_t {
+     return *this;
+   }
+ 
+-  bfloat16_t operator--() noexcept {
++  // pre-decrement operator (--x)
++  bfloat16_t& operator--() noexcept {
+     raw = static_cast<Raw>(raw - Raw{1});
+     return *this;
+   }
+ 
++  // post-decrement operator (x--)
+   bfloat16_t operator--(int) noexcept {
++    bfloat16_t result = *this;
+     raw = static_cast<Raw>(raw - Raw{1});
+-    return *this;
++    return result;
+   }
+ 
+-  bfloat16_t operator++() noexcept {
++  // pre-increment operator (++x)
++  bfloat16_t& operator++() noexcept {
+     raw = static_cast<Raw>(raw + Raw{1});
+     return *this;
+   }
+ 
++  // post-increment operator (x++)
+   bfloat16_t operator++(int) noexcept {
++    bfloat16_t result = *this;
+     raw = static_cast<Raw>(raw + Raw{1});
+-    return *this;
++    return result;
+   }
+ 
+   constexpr bfloat16_t operator-() const noexcept {
