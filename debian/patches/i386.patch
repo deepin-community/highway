@@ -1,0 +1,15 @@
+Description: Really skip test on i386+excess precision
+Author: Mathieu Malaterre <malat@debian.org>
+Forwarded: no
+Last-Update: 2023-08-31
+
+--- highway-1.0.7.orig/hwy/contrib/math/math_test.cc
++++ highway-1.0.7/hwy/contrib/math/math_test.cc
+@@ -87,6 +87,7 @@ HWY_NOINLINE void TestMath(const char* n
+       fprintf(stderr,
+               "Skipping math_test due to GCC issue with excess precision.\n");
+     }
++    return;
+   }
+ 
+   using UintT = MakeUnsigned<T>;

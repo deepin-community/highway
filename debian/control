@@ -1,15 +1,51 @@
-Source: template-repository
-Section: unknown
+Source: highway
+Section: libs
 Priority: optional
-Maintainer: Tsic404 <liuheng@deepin.org>
-Build-Depends: debhelper (>= 11)
-Standards-Version: 4.1.3
-Homepage: https://github.com/deepin-community/template-repository
-#Vcs-Browser: https://salsa.debian.org/debian/deepin-community-template-repository
-#Vcs-Git: https://salsa.debian.org/debian/deepin-community-template-repository.git
+Maintainer: Debian PhotoTools Maintainers <pkg-phototools-devel@lists.alioth.debian.org>
+Uploaders: Mathieu Malaterre <malat@debian.org>
+Build-Depends: cmake, debhelper (>= 11), libgtest-dev, ninja-build
+Build-Depends-Indep: ghostscript
+Standards-Version: 4.6.2
+Homepage: https://github.com/google/highway
+Vcs-Git: https://salsa.debian.org/debian-phototools-team/highway.git
+Vcs-Browser: https://salsa.debian.org/debian-phototools-team/highway
+Rules-Requires-Root: no
 
-Package: template-repository
+Package: libhwy1
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: <insert up to 60 chars description>
- <insert long description, indented with spaces>
+Pre-Depends: ${misc:Pre-Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Multi-Arch: same
+Description: Efficient and performance-portable SIMD wrapper (runtime files)
+ This library provides type-safe and source-code portable wrappers over
+ existing platform-specific intrinsics. Its design aims for simplicity,
+ reliable efficiency across platforms, and immediate usability with current
+ compilers.
+ .
+ This package installs the highway runtime files.
+
+Package: libhwy-dev
+Architecture: any
+Section: libdevel
+Pre-Depends: ${misc:Pre-Depends}
+Depends: libhwy1 (= ${binary:Version}), ${misc:Depends}
+Multi-Arch: same
+Description: Efficient and performance-portable SIMD wrapper (developer files)
+ This library provides type-safe and source-code portable wrappers over
+ existing platform-specific intrinsics. Its design aims for simplicity,
+ reliable efficiency across platforms, and immediate usability with current
+ compilers.
+ .
+ This package installs the highway development files.
+
+Package: highway-doc
+Architecture: all
+Section: doc
+Depends: doc-base, ${misc:Depends}
+Description: Efficient and performance-portable SIMD wrapper (documentation files)
+ This library provides type-safe and source-code portable wrappers over
+ existing platform-specific intrinsics. Its design aims for simplicity,
+ reliable efficiency across platforms, and immediate usability with current
+ compilers.
+ .
+ This package installs the highway documentation files.
