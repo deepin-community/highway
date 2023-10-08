@@ -1,5 +1,350 @@
-template-repository (1.0-1) unstable; urgency=medium
+highway (1.0.7-8) unstable; urgency=medium
 
-  * Initial release
+  * d/rules: Remove gcc-12 workaround
+  * d/patches: Fix bug on aarch64+emu128
+  * d/rules: Prefer EMU128 over SCALAR
 
- -- Tsic404 <liuheng@deepin.org>  Sat, 28 Jan 2023 13:46:49 +0800
+ -- Mathieu Malaterre <malat@debian.org>  Fri, 06 Oct 2023 09:30:48 +0200
+
+highway (1.0.7-7) unstable; urgency=medium
+
+  * d/rules: Do not build EMU128 code
+  * d/patches: Really fix ppc10/htm issue
+
+ -- Mathieu Malaterre <malat@debian.org>  Fri, 15 Sep 2023 11:47:57 +0200
+
+highway (1.0.7-6) unstable; urgency=medium
+
+  * d/patches: workaround for inlining error on ppc64el
+  * d/rules: Run armhf/neon test suite
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 14 Sep 2023 14:45:34 +0200
+
+highway (1.0.7-5) unstable; urgency=medium
+
+  * d/patches: Workaround for ppc64el/lto
+  * d/rules: Run math_test on i386 cpus
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 14 Sep 2023 08:26:21 +0200
+
+highway (1.0.7-4) unstable; urgency=medium
+
+  * d/patches: Workaround to current RVV/GCC-13 limitation
+  * d/patches: Remove extra ppc64el patch not needed
+
+ -- Mathieu Malaterre <malat@debian.org>  Wed, 13 Sep 2023 08:43:20 +0200
+
+highway (1.0.7-3) unstable; urgency=medium
+
+  * d/patches: fix compilation with LTO
+  * d/rules: Workaround for loong64 and old GCC 12.x
+  * d/rules: Start building with LTO
+  * d/rules: Start building highway with g++-13 on most arches
+  * d/control: Add explicit highway keyword. Closes: #1051450
+
+ -- Mathieu Malaterre <malat@debian.org>  Tue, 12 Sep 2023 08:45:41 +0200
+
+highway (1.0.7-2) unstable; urgency=medium
+
+  * d/patches: Fix make test on i386
+  * d/rules: Prefer g++-12 for now. See #1050933
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 31 Aug 2023 16:20:57 +0200
+
+highway (1.0.7-1) unstable; urgency=medium
+
+  * New upstream version 1.0.7
+  * d/patches: Fixes for float16_t/bfloat16_t operator++ and operator--
+  * d/rules: Fix armhf neon-less system. Closes: #1033656
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 31 Aug 2023 12:09:44 +0200
+
+highway (1.0.6-1) unstable; urgency=medium
+
+  * d/install: Run wrap-and-sort
+  * New upstream version 1.0.6
+
+ -- Mathieu Malaterre <malat@debian.org>  Sat, 26 Aug 2023 14:00:06 +0200
+
+highway (1.0.5-1) unstable; urgency=medium
+
+  * New upstream version 1.0.5
+  * d/symbols: Add missing symbols
+
+ -- Mathieu Malaterre <malat@debian.org>  Wed, 23 Aug 2023 11:39:21 +0200
+
+highway (1.0.4-1) unstable; urgency=medium
+
+  [ Debian Janitor ]
+  * Remove constraints unnecessary since buster (oldstable)
+
+  [ Mathieu Malaterre ]
+  * New upstream version 1.0.4
+  * d/patches: Remove patches applied upstream
+
+ -- Mathieu Malaterre <malat@debian.org>  Tue, 22 Aug 2023 13:11:58 +0200
+
+highway (1.0.3-3) unstable; urgency=medium
+
+  [ Helmut Grohne ]
+  * Fix FTCBFS: (Closes: #1024244)
+  * Fix a pile of build vs host confusions.
+
+ -- Mathieu Malaterre <malat@debian.org>  Fri, 24 Feb 2023 08:52:20 +0100
+
+highway (1.0.3-2) unstable; urgency=medium
+
+  * d/control: Bump Std-Vers to 4.6.2 no changes needed
+  * d/patches: Make sure to put hwy target in hwy:: namespace
+
+ -- Mathieu Malaterre <malat@debian.org>  Wed, 01 Feb 2023 18:57:25 +0100
+
+highway (1.0.3-1) unstable; urgency=medium
+
+  * New upstream version 1.0.3
+  * d/patches: Remove patches applied upstream
+  * d/patches: Generate and install a HWYConfig.cmake file
+  * d/patches: Fixed HWY_SCALAR BitCast to copy only sizeof(T) bytes
+  * d/install: Install *.cmake files
+
+ -- Mathieu Malaterre <malat@debian.org>  Sun, 29 Jan 2023 15:52:03 +0100
+
+highway (1.0.2-4) unstable; urgency=medium
+
+  * d/patches: Add missing atomic library to test
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 03 Nov 2022 11:29:42 +0100
+
+highway (1.0.2-3) unstable; urgency=medium
+
+  * d/patches: Fix cmake issue with usage of PRIVATE keyword
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 03 Nov 2022 10:34:54 +0100
+
+highway (1.0.2-2) unstable; urgency=medium
+
+  * d/patches: Fix build with atomic lib
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 03 Nov 2022 09:38:31 +0100
+
+highway (1.0.2-1) unstable; urgency=medium
+
+  * New upstream version 1.0.2
+  * d/patches: Remove patches applied upstream
+  * d/symbols: Add new symbols
+
+ -- Mathieu Malaterre <malat@debian.org>  Wed, 02 Nov 2022 15:55:21 +0100
+
+highway (1.0.1-3) unstable; urgency=medium
+
+  * d/patches: Remove some warnings on clang/riscv-64
+  * d/patches: Hack around current rdcycle mess
+  * d/patches: Remove warnings on arm/gcc-12
+  * d/patches: Rename patch to refer upstream
+  * d/rules: Make sure to compile without warnings
+
+ -- Mathieu Malaterre <malat@debian.org>  Fri, 02 Sep 2022 12:16:04 +0200
+
+highway (1.0.1-2) unstable; urgency=medium
+
+  * d/patches: cherry-pick patch upstream to fix compilation on riscv64
+  * d/rules: Remove hack on riscv64 not needed anymore
+  * d/patches: Properly detect HWY_BROKEN_EMU128 / GCC 12.x
+  * d/rules: Comment out HWY_BROKEN_EMU128 hack now detection is working
+
+ -- Mathieu Malaterre <malat@debian.org>  Wed, 31 Aug 2022 09:00:14 +0200
+
+highway (1.0.1-1) unstable; urgency=medium
+
+  * New upstream version 1.0.1
+  * d/patches: Refresh patches for new upstream release
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 25 Aug 2022 09:37:14 +0200
+
+highway (1.0.0-5) unstable; urgency=medium
+
+  * d/patches: Do not always inline
+  * d/patches: fix floating-point generator for sort tests.
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 04 Aug 2022 08:39:49 +0200
+
+highway (1.0.0-4) unstable; urgency=medium
+
+  * d/rules: Make sure to skip RVV logic on riscv64
+  * d/rules: Start building with neon extension on armhf
+  * d/patches: fix spurious use after free warning
+  * d/patches: fix preprocessor int overflow warning
+  * d/patches: link with atomic for GCC
+
+ -- Mathieu Malaterre <malat@debian.org>  Tue, 02 Aug 2022 14:02:56 +0200
+
+highway (1.0.0-3) unstable; urgency=medium
+
+  * d/patches: Add atomic patch to fix compilation
+  * d/patches: Add riscv64 compilation fix for GCC
+
+ -- Mathieu Malaterre <malat@debian.org>  Tue, 02 Aug 2022 10:38:12 +0200
+
+highway (1.0.0-2) unstable; urgency=medium
+
+  * d/symbols: Fix symbols file on 32bits arch
+
+ -- Mathieu Malaterre <malat@debian.org>  Tue, 02 Aug 2022 07:44:42 +0200
+
+highway (1.0.0-1) unstable; urgency=medium
+
+  * d/watch: Fix typo in watch file
+  * d/copyright: Simplify copyright file
+  * New upstream version 1.0.0
+  * d/rules: Build SCALAR instead of EMU128
+  * d/patches: Remove patches applied upstream
+  * d/symbols: Update symbols file for new ABI
+
+ -- Mathieu Malaterre <malat@debian.org>  Mon, 01 Aug 2022 10:50:07 +0200
+
+highway (0.17.0-11) unstable; urgency=medium
+
+  * d/patches: Fix blockwise_test on big-endian arches
+
+ -- Mathieu Malaterre <malat@debian.org>  Wed, 20 Jul 2022 17:21:46 +0200
+
+highway (0.17.0-10) unstable; urgency=medium
+
+  * d/rules: Prefer DEB_BUILD_ARCH_CPU over DEB_BUILD_ARCH
+  * d/rules: Do not report warnings as errors anymore. Closes: #1012944
+  * d/rules: Simplify handling of hurd+qemu
+  * d/patches: Revert baseline EMU128 back to SCALAR. Closes: #1015256
+
+ -- Mathieu Malaterre <malat@debian.org>  Mon, 18 Jul 2022 15:42:24 +0200
+
+highway (0.17.0-9) unstable; urgency=medium
+
+  * d/rules: Really fix armhf build
+
+ -- Mathieu Malaterre <malat@debian.org>  Tue, 05 Jul 2022 14:18:09 +0200
+
+highway (0.17.0-8) unstable; urgency=medium
+
+  * d/rules: Make sure to cleanup generated files
+  * d/rules: Do not run test on -indep target
+  * d/rules: Make sure to return true on hurd-i386
+  * d/rules: Work around an issue with gcc-11/O2 combination
+  * d/patches: Remove arm WIP for now
+
+ -- Mathieu Malaterre <malat@debian.org>  Tue, 05 Jul 2022 11:18:15 +0200
+
+highway (0.17.0-7) experimental; urgency=medium
+
+  * d/rules: Make sure to skip most rules for indep
+  * d/rules: Shrink the main PDF file using gs
+  * d/patches: Fix dynamic dispatch on linux/armhf. Closes: #1014330
+
+ -- Mathieu Malaterre <malat@debian.org>  Mon, 04 Jul 2022 15:31:59 +0200
+
+highway (0.17.0-6) experimental; urgency=low
+
+  * d/rules: Make sure to install binaries
+  * d/rules: Attempt to get neon on armhf working
+
+ -- Mathieu Malaterre <malat@debian.org>  Mon, 04 Jul 2022 12:13:12 +0200
+
+highway (0.17.0-5) experimental; urgency=low
+
+  * d/rules: Remove no-psabi warning on both armel and armhf
+  * d/rules: Re-add extension on i386
+  * d/rules: Run the compiled example
+
+ -- Mathieu Malaterre <malat@debian.org>  Mon, 04 Jul 2022 11:04:54 +0200
+
+highway (0.17.0-4) unstable; urgency=medium
+
+  * d/patches: Fix armhf compilation failure
+
+ -- Mathieu Malaterre <malat@debian.org>  Tue, 28 Jun 2022 11:54:52 +0200
+
+highway (0.17.0-3) unstable; urgency=medium
+
+  * d/rules: Disable Emu128 on armhf for now, revert to Scalar
+  * d/patches: Fix unit test on big-endian arches
+
+ -- Mathieu Malaterre <malat@debian.org>  Mon, 27 Jun 2022 16:46:06 +0200
+
+highway (0.17.0-2) unstable; urgency=medium
+
+  * d/patches: cherry-pick a fix for arm64/armhf
+
+ -- Mathieu Malaterre <malat@debian.org>  Wed, 22 Jun 2022 08:47:55 +0200
+
+highway (0.17.0-1) unstable; urgency=medium
+
+  * New upstream version 0.17.0
+  * d/patches: Fix symbols mangling issue
+  * d/symbols: Update symbols for new release
+  * d/control: Bump Std-Vers to 4.6.1 no changes needed
+  * d/rules: Remove some CPU extension on i386
+
+ -- Mathieu Malaterre <malat@debian.org>  Tue, 21 Jun 2022 17:13:46 +0200
+
+highway (0.16.0-1) unstable; urgency=medium
+
+  * d/rules: Make sure to check level 4 symbol file
+  * d/symbols: Add symbol for 32bits arch
+  * d/binaries: Specify path to PDF files
+  * d/copyright: Update to latest year
+  * d/compat: Bump compat to 11
+  * d/control: Make sure to depends on runtime
+  * New upstream version 0.16.0
+  * d/symbols: Add new symbols from 0.16.0
+
+ -- Mathieu Malaterre <malat@debian.org>  Mon, 21 Feb 2022 10:20:45 +0100
+
+highway (0.15.1~git20220119.fbe5705-1) experimental; urgency=medium
+
+  * New upstream version 0.15.1~git20220119.fbe5705
+  * d/patches: Remove patches applied upstream
+  * d/libhwy0: Provide highway as shared libraries
+  * d/doc-base: Add missing doc-base registration file
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 20 Jan 2022 09:03:02 +0100
+
+highway (0.15.0-5) unstable; urgency=medium
+
+  * d/rules: Clarify that we only ship static libs for now
+  * d/control: Add missing Rules-Requires-Root: no
+  * d/patches: Remove compilation error on GNU/Hurd
+  * d/rules: Set HWY_CMAKE_ARM7 to OFF. Closes: #1003218
+  * d/patches: Fix compilation error on riscv64
+
+ -- Mathieu Malaterre <malat@debian.org>  Tue, 11 Jan 2022 14:52:28 +0100
+
+highway (0.15.0-4) unstable; urgency=medium
+
+  * d/docs: Create new highway-doc package
+  * d/rules: Do not set HWY_CMAKE_ARM7:ON for arm64
+  * d/rules: Prefer building using cmake+ninja
+  * d/rules: Properly setup HWY_CMAKE_ARM7 on armhf. Closes: #1003218
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 06 Jan 2022 15:21:05 +0100
+
+highway (0.15.0-3) unstable; urgency=medium
+
+  * d/rules: Fix typo in cmake armhf/neon option
+  * d/rules: Make sure to use neon extension on arm64
+  * d/control: libhwy-dev could be marked Multi-Arch: same
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 06 Jan 2022 13:59:37 +0100
+
+highway (0.15.0-2) unstable; urgency=medium
+
+  * Upload to unstable
+  * d/rules: Make sure to compile without warnings
+  * d/rules: Start using arm7 neon extension
+  * d/patches: Prefer default gcc c++ version
+
+ -- Mathieu Malaterre <malat@debian.org>  Tue, 04 Jan 2022 15:45:40 +0100
+
+highway (0.15.0-1) experimental; urgency=medium
+
+  * Initial release (Closes: #1000984)
+
+ -- Mathieu Malaterre <malat@debian.org>  Thu, 02 Dec 2021 21:42:02 +0100

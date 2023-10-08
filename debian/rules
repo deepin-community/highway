@@ -1,4 +1,103 @@
 #!/usr/bin/make -f
+#export DH_VERBOSE=1
+
+include /usr/share/dpkg/default.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all optimize=+lto
+export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
 
 %:
-	dh $@
+	dh $@ --buildsystem=cmake+ninja
+
+# Let's pretend to know what we are doing:
+DEB_CXXFLAGS_MAINT_APPEND += -DHWY_BROKEN_EMU128=0
+
+ifneq (,$(filter $(DEB_HOST_ARCH), armel armhf))
+  # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77728
+  DEB_CXXFLAGS_MAINT_APPEND += -Wno-psabi
+endif
+
+ifneq (,$(filter $(DEB_HOST_ARCH), loong64))
+  # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=106322
+  DEB_CXXFLAGS_MAINT_APPEND += -fno-tree-vectorize
+endif
+
+ifeq ($(DEB_HOST_ARCH_CPU),i386)
+  # https://github.com/google/highway/issues/1488
+  DEB_CXXFLAGS_MAINT_APPEND += -fexcess-precision=standard
+endif
+
+ifeq ($(DEB_HOST_ARCH),$(filter $(DEB_HOST_ARCH),armhf))
+  # https://github.com/google/highway/issues/1271
+  CMAKE_EXTRA_FLAGS += -DHWY_CMAKE_ARM7:BOOL=ON
+  # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=111231
+  DEB_CXXFLAGS_MAINT_APPEND += -fno-tree-vectorize
+endif
+
+ifeq ($(DEB_HOST_ARCH),$(filter $(DEB_HOST_ARCH),riscv64))
+  # https://github.com/google/highway/issues/1740
+  CMAKE_EXTRA_FLAGS += -DHWY_CMAKE_RVV:BOOL=OFF
+endif
+
+include /usr/share/dpkg/buildtools.mk
+
+export DEB_CXXFLAGS_MAINT_APPEND
+
+# test suite rely on CMAKE_SKIP_RPATH=OFF
+CMAKE_EXTRA_FLAGS += \
+ -DCMAKE_SKIP_RPATH:BOOL=OFF \
+ -DBUILD_SHARED_LIBS:BOOL=ON \
+ -DHWY_WARNINGS_ARE_ERRORS:BOOL=ON \
+ -DHWY_SYSTEM_GTEST:BOOL=ON
+
+ifneq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+CMAKE_EXTRA_FLAGS += -DBUILD_TESTING=OFF
+endif
+
+override_dh_auto_configure-arch:
+	dh_auto_configure -- $(CMAKE_EXTRA_FLAGS)
+
+override_dh_auto_install-arch:
+ifeq ($(DEB_HOST_ARCH),$(filter $(DEB_HOST_ARCH),armhf))
+	sed -i -e 's/HWY_CMAKE_ARM7:BOOL=ON/HWY_CMAKE_ARM7:BOOL=OFF/' obj-*/CMakeCache.txt
+endif
+	dh_auto_install
+
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+# run default example to check compilation ok:
+override_dh_install-arch:
+ifeq (,$(filter $(DEB_BUILD_ARCH),hurd-i386))
+	obj-*/examples/hwy_benchmark
+else
+	echo "CPU 'QEMU Virtual CPU version 2.5+' does not support RDTSCP, skipping benchmark."
+endif
+	dh_install
+endif
+
+override_dh_clean-indep:
+	dh_clean debian_docs/
+
+override_dh_auto_configure-indep:
+override_dh_auto_build-indep:
+	# most docs are ok as-is
+	cp -a g3doc debian_docs
+	# let's shrink a bit this one:
+	gs  -q -dNOPAUSE -dBATCH -dSAFER \
+		-sDEVICE=pdfwrite \
+		-dCompatibilityLevel=1.4 \
+		-dPDFSETTINGS=/screen \
+		-dEmbedAllFonts=true \
+		-dSubsetFonts=true \
+		-dColorImageDownsampleType=/Bicubic \
+		-dColorImageResolution=72 \
+		-dGrayImageDownsampleType=/Bicubic \
+		-dGrayImageResolution=72 \
+		-dMonoImageDownsampleType=/Bicubic \
+		-dMonoImageResolution=72 \
+		-sOutputFile=debian_docs/highway_intro.pdf ./g3doc/highway_intro.pdf
+
+override_dh_auto_test-indep:
+override_dh_auto_install-indep:
+override_dh_compress-indep:
+	# do not compress .pdf/.md files for documentation
+	dh_compress -X.md -X.pdf
