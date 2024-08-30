@@ -3,7 +3,7 @@ Section: libs
 Priority: optional
 Maintainer: Debian PhotoTools Maintainers <pkg-phototools-devel@lists.alioth.debian.org>
 Uploaders: Mathieu Malaterre <malat@debian.org>
-Build-Depends: cmake, debhelper (>= 11), libgtest-dev, ninja-build
+Build-Depends: dpkg-dev (>= 1.22.5), cmake, debhelper (>= 11), libgtest-dev, ninja-build
 Build-Depends-Indep: ghostscript
 Standards-Version: 4.6.2
 Homepage: https://github.com/google/highway
@@ -11,7 +11,10 @@ Vcs-Git: https://salsa.debian.org/debian-phototools-team/highway.git
 Vcs-Browser: https://salsa.debian.org/debian-phototools-team/highway
 Rules-Requires-Root: no
 
-Package: libhwy1
+Package: libhwy1t64
+Provides: ${t64:Provides}
+Replaces: libhwy1
+Breaks: libhwy1 (<< ${source:Version})
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${misc:Depends}, ${shlibs:Depends}
@@ -28,7 +31,7 @@ Package: libhwy-dev
 Architecture: any
 Section: libdevel
 Pre-Depends: ${misc:Pre-Depends}
-Depends: libhwy1 (= ${binary:Version}), ${misc:Depends}
+Depends: libhwy1t64 (= ${binary:Version}), ${misc:Depends}
 Multi-Arch: same
 Description: Efficient and performance-portable SIMD wrapper (developer files)
  This library provides type-safe and source-code portable wrappers over

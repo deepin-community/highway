@@ -13,6 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <stddef.h>
+#include <stdint.h>
+
 #undef HWY_TARGET_INCLUDE
 #define HWY_TARGET_INCLUDE "tests/count_test.cc"
 #include "hwy/foreach_target.h"  // IWYU pragma: keep
@@ -74,40 +77,45 @@ struct TestLeadingZeroCount {
     size_t N = Lanes(d);
     auto data = AllocateAligned<T>(N);
     auto lzcnt = AllocateAligned<T>(N);
+    HWY_ASSERT(data && lzcnt);
 
-    constexpr T kNumOfBitsInT{sizeof(T) * 8};
+    constexpr T kNumOfBitsInT = static_cast<T>(sizeof(T) * 8);
     for (size_t j = 0; j < N; j++) {
       lzcnt[j] = kNumOfBitsInT;
     }
     HWY_ASSERT_VEC_EQ(d, lzcnt.get(), LeadingZeroCount(Zero(d)));
 
     for (size_t j = 0; j < N; j++) {
-      lzcnt[j] = T{kNumOfBitsInT - 1};
+      lzcnt[j] = static_cast<T>(kNumOfBitsInT - 1);
     }
-    HWY_ASSERT_VEC_EQ(d, lzcnt.get(), LeadingZeroCount(Set(d, T{1})));
+    HWY_ASSERT_VEC_EQ(d, lzcnt.get(),
+                      LeadingZeroCount(Set(d, static_cast<T>(1))));
 
     for (size_t j = 0; j < N; j++) {
-      lzcnt[j] = T{kNumOfBitsInT - 2};
+      lzcnt[j] = static_cast<T>(kNumOfBitsInT - 2);
     }
-    HWY_ASSERT_VEC_EQ(d, lzcnt.get(), LeadingZeroCount(Set(d, T{2})));
+    HWY_ASSERT_VEC_EQ(d, lzcnt.get(),
+                      LeadingZeroCount(Set(d, static_cast<T>(2))));
 
     for (size_t j = 0; j < N; j++) {
-      lzcnt[j] = T{0};
+      lzcnt[j] = static_cast<T>(0);
     }
     HWY_ASSERT_VEC_EQ(
         d, lzcnt.get(),
         LeadingZeroCount(BitCast(d, Set(du, TU{1} << (kNumOfBitsInT - 1)))));
 
     for (size_t j = 0; j < N; j++) {
-      lzcnt[j] = T{1};
+      lzcnt[j] = static_cast<T>(1);
     }
-    HWY_ASSERT_VEC_EQ(d, lzcnt.get(),
-                      LeadingZeroCount(Set(d, T{1} << (kNumOfBitsInT - 2))));
+    HWY_ASSERT_VEC_EQ(
+        d, lzcnt.get(),
+        LeadingZeroCount(Set(d, static_cast<T>(1) << (kNumOfBitsInT - 2))));
 
     for (size_t j = 0; j < N; j++) {
-      lzcnt[j] = T{kNumOfBitsInT - 5};
+      lzcnt[j] = static_cast<T>(kNumOfBitsInT - 5);
     }
-    HWY_ASSERT_VEC_EQ(d, lzcnt.get(), LeadingZeroCount(Set(d, T{0x1D})));
+    HWY_ASSERT_VEC_EQ(d, lzcnt.get(),
+                      LeadingZeroCount(Set(d, static_cast<T>(0x1D))));
 
     for (size_t i = 0; i < AdjustedReps(1000); i++) {
       for (size_t j = 0; j < N; j++) {
@@ -148,40 +156,45 @@ struct TestTrailingZeroCount {
     size_t N = Lanes(d);
     auto data = AllocateAligned<T>(N);
     auto tzcnt = AllocateAligned<T>(N);
+    HWY_ASSERT(data && tzcnt);
 
-    constexpr T kNumOfBitsInT{sizeof(T) * 8};
+    constexpr T kNumOfBitsInT = static_cast<T>(sizeof(T) * 8);
     for (size_t j = 0; j < N; j++) {
       tzcnt[j] = kNumOfBitsInT;
     }
     HWY_ASSERT_VEC_EQ(d, tzcnt.get(), TrailingZeroCount(Zero(d)));
 
     for (size_t j = 0; j < N; j++) {
-      tzcnt[j] = T{0};
+      tzcnt[j] = static_cast<T>(0);
     }
-    HWY_ASSERT_VEC_EQ(d, tzcnt.get(), TrailingZeroCount(Set(d, T{1})));
+    HWY_ASSERT_VEC_EQ(d, tzcnt.get(),
+                      TrailingZeroCount(Set(d, static_cast<T>(1))));
 
     for (size_t j = 0; j < N; j++) {
-      tzcnt[j] = T{1};
+      tzcnt[j] = static_cast<T>(1);
     }
-    HWY_ASSERT_VEC_EQ(d, tzcnt.get(), TrailingZeroCount(Set(d, T{2})));
+    HWY_ASSERT_VEC_EQ(d, tzcnt.get(),
+                      TrailingZeroCount(Set(d, static_cast<T>(2))));
 
     for (size_t j = 0; j < N; j++) {
-      tzcnt[j] = T{kNumOfBitsInT - 1};
+      tzcnt[j] = static_cast<T>(kNumOfBitsInT - 1);
     }
     HWY_ASSERT_VEC_EQ(
         d, tzcnt.get(),
         TrailingZeroCount(BitCast(d, Set(du, TU{1} << (kNumOfBitsInT - 1)))));
 
     for (size_t j = 0; j < N; j++) {
-      tzcnt[j] = T{kNumOfBitsInT - 2};
+      tzcnt[j] = static_cast<T>(kNumOfBitsInT - 2);
     }
-    HWY_ASSERT_VEC_EQ(d, tzcnt.get(),
-                      TrailingZeroCount(Set(d, T{1} << (kNumOfBitsInT - 2))));
+    HWY_ASSERT_VEC_EQ(
+        d, tzcnt.get(),
+        TrailingZeroCount(Set(d, static_cast<T>(1) << (kNumOfBitsInT - 2))));
 
     for (size_t j = 0; j < N; j++) {
-      tzcnt[j] = T{3};
+      tzcnt[j] = static_cast<T>(3);
     }
-    HWY_ASSERT_VEC_EQ(d, tzcnt.get(), TrailingZeroCount(Set(d, T{0x68})));
+    HWY_ASSERT_VEC_EQ(d, tzcnt.get(),
+                      TrailingZeroCount(Set(d, static_cast<T>(0x68))));
 
     for (size_t i = 0; i < AdjustedReps(1000); i++) {
       for (size_t j = 0; j < N; j++) {
@@ -217,9 +230,10 @@ class TestHighestSetBitIndex {
     size_t N = Lanes(d);
     auto data = AllocateAligned<T>(N);
     auto hsb_index = AllocateAligned<T>(N);
+    HWY_ASSERT(data && hsb_index);
 
-    constexpr T kNumOfBitsInT{sizeof(T) * 8};
-    constexpr T kMsbIdx{kNumOfBitsInT - 1};
+    constexpr T kNumOfBitsInT = static_cast<T>(sizeof(T) * 8);
+    constexpr T kMsbIdx = static_cast<T>(kNumOfBitsInT - 1);
 
     for (size_t j = 0; j < N; j++) {
       hsb_index[j] = static_cast<T>(-1);
@@ -228,36 +242,37 @@ class TestHighestSetBitIndex {
                       NormalizedHighestSetBitIndex(Zero(d)));
 
     for (size_t j = 0; j < N; j++) {
-      hsb_index[j] = T{0};
+      hsb_index[j] = static_cast<T>(0);
     }
     HWY_ASSERT_VEC_EQ(d, hsb_index.get(),
-                      NormalizedHighestSetBitIndex(Set(d, T{1})));
+                      NormalizedHighestSetBitIndex(Set(d, static_cast<T>(1))));
 
     for (size_t j = 0; j < N; j++) {
-      hsb_index[j] = T{1};
+      hsb_index[j] = static_cast<T>(1);
     }
     HWY_ASSERT_VEC_EQ(d, hsb_index.get(),
-                      NormalizedHighestSetBitIndex(Set(d, T{3})));
+                      NormalizedHighestSetBitIndex(Set(d, static_cast<T>(3))));
 
     for (size_t j = 0; j < N; j++) {
-      hsb_index[j] = T{kNumOfBitsInT - 1};
+      hsb_index[j] = static_cast<T>(kNumOfBitsInT - 1);
     }
     HWY_ASSERT_VEC_EQ(d, hsb_index.get(),
                       NormalizedHighestSetBitIndex(
                           BitCast(d, Set(du, TU{1} << (kNumOfBitsInT - 1)))));
 
     for (size_t j = 0; j < N; j++) {
-      hsb_index[j] = T{kNumOfBitsInT - 2};
+      hsb_index[j] = static_cast<T>(kNumOfBitsInT - 2);
+    }
+    HWY_ASSERT_VEC_EQ(d, hsb_index.get(),
+                      NormalizedHighestSetBitIndex(
+                          Set(d, static_cast<T>(1) << (kNumOfBitsInT - 2))));
+
+    for (size_t j = 0; j < N; j++) {
+      hsb_index[j] = static_cast<T>(5);
     }
     HWY_ASSERT_VEC_EQ(
         d, hsb_index.get(),
-        NormalizedHighestSetBitIndex(Set(d, T{1} << (kNumOfBitsInT - 2))));
-
-    for (size_t j = 0; j < N; j++) {
-      hsb_index[j] = T{5};
-    }
-    HWY_ASSERT_VEC_EQ(d, hsb_index.get(),
-                      NormalizedHighestSetBitIndex(Set(d, T{0x2B})));
+        NormalizedHighestSetBitIndex(Set(d, static_cast<T>(0x2B))));
 
     for (size_t i = 0; i < AdjustedReps(1000); i++) {
       for (size_t j = 0; j < N; j++) {
@@ -288,6 +303,7 @@ HWY_EXPORT_AND_TEST_P(HwyCountTest, TestAllPopulationCount);
 HWY_EXPORT_AND_TEST_P(HwyCountTest, TestAllLeadingZeroCount);
 HWY_EXPORT_AND_TEST_P(HwyCountTest, TestAllTrailingZeroCount);
 HWY_EXPORT_AND_TEST_P(HwyCountTest, TestAllHighestSetBitIndex);
+HWY_AFTER_TEST();
 }  // namespace hwy
 
 #endif

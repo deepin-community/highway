@@ -1,7 +1,5 @@
 # API synopsis / quick reference
 
-[[_TOC_]]
-
 ## High-level overview
 
 Highway is a collection of 'ops': platform-agnostic pure functions that operate
@@ -53,10 +51,19 @@ available implementation at runtime. Highway supports three ways of doing this:
     your own. `HWY_DYNAMIC_DISPATCH` calls into a table of function pointers
     with a zero-based index indicating the desired target. Instead of calling it
     immediately, you can also save the function pointer returned by
-    `HWY_DYNAMIC_POINTER`. You can also replace the table lookup with your own
-    choice of index, or even call e.g. `N_AVX2::YourFunction` directly.
+    `HWY_DYNAMIC_POINTER`. Note that `HWY_DYNAMIC_POINTER` returns the same
+    pointer that `HWY_DYNAMIC_DISPATCH` would. When either of them are first
+    invoked, the function pointer first detects the CPU, then calls your actual
+    function. You can call `GetChosenTarget().Update(SupportedTargets());` to
+    ensure future dynamic dispatch avoids the overhead of CPU detection.
+    You can also replace the table lookup with your own choice of index, or even
+    call e.g. `N_AVX2::YourFunction` directly.
 
 Examples of both static and dynamic dispatch are provided in examples/.
+Typically, the function that does the dispatch receives a pointer to one or more
+arrays. Due to differing ABIs, we recommend only passing vector arguments to
+functions that are inlined, and in particular not the top-level function that
+does the dispatch.
 
 Note that if your compiler is pre-configured to generate code only for a
 specific architecture, or your build flags include -m flags that specify a
@@ -66,12 +73,14 @@ Raspberry Pi CPU that lacks AES, by specifying `-march=armv8-a+crc`. When we
 build the `HWY_NEON` target (which would only be used if the CPU actually does
 have AES), there is a conflict between the `arch=armv8-a+crypto` that is set via
 pragma only for the vector code, and the global `-march`. This results in a
-compile error, see #1570 and #1460. As a workaround, we recommend defining
-`HWY_COMPILE_ONLY_STATIC` when building Highway as well as any user code that
-includes Highway headers. As a result, only the baseline target is compiled.
-Note that it is fine for user code to still call `HWY_DYNAMIC_DISPATCH`. When
-Highway is only built for a single target, `HWY_DYNAMIC_DISPATCH` results in the
-same direct call that `HWY_STATIC_DISPATCH` would produce.
+compile error, see #1460, #1570, and #1707. As a workaround, we recommend
+avoiding -m flags if possible, and otherwise defining `HWY_COMPILE_ONLY_STATIC`
+or `HWY_SKIP_NON_BEST_BASELINE` when building Highway as well as any user code
+that includes Highway headers. As a result, only the baseline target, or targets
+at least as good as the baseline, will be compiled. Note that it is fine for
+user code to still call `HWY_DYNAMIC_DISPATCH`. When Highway is only built for a
+single target, `HWY_DYNAMIC_DISPATCH` results in the same direct call that
+`HWY_STATIC_DISPATCH` would produce.
 
 ## Headers
 
@@ -130,6 +139,10 @@ omit this if your code will only ever use static dispatch.
 
 ## Notation in this doc
 
+By vector 'lanes', we mean the 'elements' of that vector. Analogous to the lanes
+of a highway or swimming pool, most operations act on each lane independently,
+but it is possible for lanes to interact and change order via 'swizzling' ops.
+
 *   `T` denotes the type of a vector lane (integer or floating-point);
 *   `N` is a size_t value that governs (but is not necessarily identical to) the
     number of lanes;
@@ -143,9 +156,10 @@ omit this if your code will only ever use static dispatch.
 
 ## Vector and tag types
 
-Highway vectors consist of one or more 'lanes' of the same built-in type
-`uint##_t, int##_t` for `## = 8, 16, 32, 64`, plus `float##_t` for `## = 16, 32,
-64` and `bfloat16_t`.
+Highway vectors consist of one or more 'lanes' of the same built-in type `T`:
+`uint##_t, int##_t` for `## = 8, 16, 32, 64`, or `float##_t` for `## = 16, 32,
+64` and `bfloat16_t`. `T` may be retrieved via `TFromD<D>`.
+`IsIntegerLaneType<T>` evaluates to true for these `int` or `uint` types.
 
 Beware that `char` may differ from these types, and is not supported directly.
 If your code loads from/stores to `char*`, use `T=uint8_t` for Highway's `d`
@@ -155,15 +169,15 @@ comparisons), and cast your `char*` pointers to your `T*`.
 In Highway, `float16_t` (an IEEE binary16 half-float) and `bfloat16_t` (the
 upper 16 bits of an IEEE binary32 float) only support load, store, and
 conversion to/from `float32_t`. The behavior of infinity and NaN in `float16_t`
-is implementation-defined due to Armv7.
+is implementation-defined due to Armv7. To ensure binary compatibility, these
+types are always wrapper structs and cannot be initialized with values directly.
+You can initialize them via `BitCastScalar` or `ConvertScalarTo`.
 
 On RVV/SVE, vectors are sizeless and cannot be wrapped inside a class. The
 Highway API allows using built-in types as vectors because operations are
 expressed as overloaded functions. Instead of constructors, overloaded
 initialization functions such as `Set` take a zero-sized tag argument called `d`
 of type `D` and return an actual vector of unspecified type.
-
-`T` is one of the lane types above, and may be retrieved via `TFromD<D>`.
 
 The actual lane count (used to increment loop counters etc.) can be obtained via
 `Lanes(d)`. This value might not be known at compile time, thus storage for
@@ -188,12 +202,11 @@ result of the previously obtained `Lanes(d)`).
 `MaxLanes(d)` returns a (potentially loose) upper bound on `Lanes(d)`, and is
 implemented as a constexpr function.
 
-The actual lane count is guaranteed to be a power of two, even on SVE hardware
-where vectors can be a multiple of 128 bits (there, the extra lanes remain
-unused). This simplifies alignment: remainders can be computed as `count &
-(Lanes(d) - 1)` instead of an expensive modulo. It also ensures loop trip counts
-that are a large power of two (at least `MaxLanes`) are evenly divisible by the
-lane count, thus avoiding the need for a second loop to handle remainders.
+The actual lane count is guaranteed to be a power of two, even on SVE. This
+simplifies alignment: remainders can be computed as `count & (Lanes(d) - 1)`
+instead of an expensive modulo. It also ensures loop trip counts that are a
+large power of two (at least `MaxLanes`) are evenly divisible by the lane count,
+thus avoiding the need for a second loop to handle remainders.
 
 `d` lvalues (a tag, NOT actual vector) are obtained using aliases:
 
@@ -291,8 +304,9 @@ Store(v, d2, ptr);  // Use d2, NOT DFromV<decltype(v)>()
 ## Targets
 
 Let `Target` denote an instruction set, one of `SCALAR/EMU128`, `RVV`,
-`SSE2/SSSE3/SSE4/AVX2/AVX3/AVX3_DL/AVX3_ZEN4` (x86), `PPC8/PPC9/PPC10` (POWER),
-`NEON/SVE/SVE2/SVE_256/SVE2_128` (Arm), `WASM/WASM_EMU256`.
+`SSE2/SSSE3/SSE4/AVX2/AVX3/AVX3_DL/AVX3_ZEN4/AVX3_SPR` (x86),
+`PPC8/PPC9/PPC10/Z14/Z15` (POWER), `WASM/WASM_EMU256` (WebAssembly),
+`NEON_WITHOUT_AES/NEON/NEON_BF16/SVE/SVE2/SVE_256/SVE2_128` (Arm).
 
 Note that x86 CPUs are segmented into dozens of feature flags and capabilities,
 which are often used together because they were introduced in the same CPU
@@ -378,8 +392,8 @@ functions reside in `project::[nested]::HWY_NAMESPACE`. Highway functions
 generally take either a `D` or vector/mask argument. For targets where vectors
 and masks are defined in namespace `hwy`, the functions will be found via
 Argument-Dependent Lookup. However, this does not work for function templates,
-and RVV and SVE both use builtin vectors. There are three options for portable
-code, in descending order of preference:
+and RVV and SVE both use built-in vectors. Thus portable code must use one of
+the three following options, in descending order of preference:
 
 -   `namespace hn = hwy::HWY_NAMESPACE;` alias used to prefix ops, e.g.
     `hn::LoadDup128(..)`;
@@ -399,11 +413,20 @@ example `Lt` instead of `operator<`.
     the given value of type `T`.
 *   <code>V **Undefined**(D)</code>: returns uninitialized N-lane vector, e.g.
     for use as an output parameter.
-*   <code>V **Iota**(D, T)</code>: returns N-lane vector where the lane with
-    index `i` has the given value of type `T` plus `i`. The least significant
-    lane has index 0. This is useful in tests for detecting lane-crossing bugs.
-*   <code>V **SignBit**(D, T)</code>: returns N-lane vector with all lanes set
+*   <code>V **Iota**(D, T2)</code>: returns N-lane vector where the lane with
+    index `i` has the given value of type `T2` (the op converts it to T) + `i`.
+    The least significant lane has index 0. This is useful in tests for
+    detecting lane-crossing bugs.
+*   <code>V **SignBit**(D)</code>: returns N-lane vector with all lanes set
     to a value whose representation has only the most-significant bit set.
+*   <code>V **Dup128VecFromValues**(D d, T t0, .., T tK)</code>: Creates a
+    vector from `K+1` values, broadcasted to each 128-bit block if `Lanes(d) >=
+    16/sizeof(T)` is true, where `K` is `16/sizeof(T) - 1`.
+
+    Dup128VecFromValues returns the following values in each 128-bit block of
+    the result, with `t0` in the least-significant (lowest-indexed) lane of each
+    128-bit block and `tK` in the most-significant (highest-indexed) lane of
+    each 128-bit block: `{t0, t1, ..., tK}`
 
 ### Getting/setting lanes
 
@@ -492,23 +515,109 @@ from left to right, of the arguments passed to `Create{2-4}`.
 *   <code>V **operator-**(V a, V b)</code>: returns `a[i] - b[i]` (mod 2^bits).
     Currently unavailable on SVE/RVV; use the equivalent `Sub` instead.
 
+*   <code>V **AddSub**(V a, V b)</code>: returns `a[i] - b[i]` in the even lanes
+    and `a[i] + b[i]` in the odd lanes.
+
+    `AddSub(a, b)` is equivalent to `OddEven(Add(a, b), Sub(a, b))` or
+    `Add(a, OddEven(b, Neg(b)))`, but `AddSub(a, b)` is more efficient
+    than `OddEven(Add(a, b), Sub(a, b))` or `Add(a, OddEven(b, Neg(b)))` on some
+    targets.
+
 *   `V`: `{i,f}` \
     <code>V **Neg**(V a)</code>: returns `-a[i]`.
+
+*   `V`: `i` \
+    <code>V **SaturatedNeg**(V a)</code>: returns
+    `a[i] == LimitsMin<T>() ? LimitsMax<T>() : -a[i]`.
+
+    `SaturatedNeg(a)` is usually more efficient than
+    `IfThenElse(Eq(a, Set(d, LimitsMin<T>())), Set(d, LimitsMax<T>()), Neg(a))`.
 
 *   `V`: `{i,f}` \
     <code>V **Abs**(V a)</code> returns the absolute value of `a[i]`; for
     integers, `LimitsMin()` maps to `LimitsMax() + 1`.
 
+*   `V`: `i` \
+    <code>V **SaturatedAbs**(V a)</code> returns
+    `a[i] == LimitsMin<T>() ? LimitsMax<T>() : (a[i] < 0 ? (-a[i]) : a[i])`.
+
+    `SaturatedAbs(a)` is usually more efficient than
+    `IfThenElse(Eq(a, Set(d, LimitsMin<T>())), Set(d, LimitsMax<T>()), Abs(a))`.
+
 *   <code>V **AbsDiff**(V a, V b)</code>: returns `|a[i] - b[i]|` in each lane.
 
-*   `V`: `u8` \
-    <code>VU64 **SumsOf8**(V v)</code> returns the sums of 8 consecutive u8
-    lanes, zero-extending each sum into a u64 lane. This is slower on RVV/WASM.
+*   `V`: `{i,u}{8,16,32},f{16,32}`, `VW`: `Vec<RepartitionToWide<DFromV<V>>>` \
+    <code>VW **SumsOf2**(V v)</code>
+    returns the sums of 2 consecutive lanes, promoting each sum into a lane of
+    `TFromV<VW>`.
 
-*   `V`: `u8` \
-    <code>VU64 **SumsOf8AbsDiff**(V a, V b)</code> returns the same result as
-    `SumsOf8(AbsDiff(a, b))` but `SumsOf8AbsDiff(a, b)` is more efficient than
-    `SumsOf8(AbsDiff(a, b))` on SSSE3/SSE4/AVX2/AVX3.
+*   `V`: `{i,u}{8,16}`,
+    `VW`: `Vec<RepartitionToWideX2<DFromV<V>>>` \
+    <code>VW **SumsOf4**(V v)</code>
+    returns the sums of 4 consecutive lanes, promoting each sum into a lane of
+    `TFromV<VW>`.
+
+*   `V`: `{i,u}8`, `VW`: `Vec<RepartitionToWideX3<DFromV<V>>>` \
+    <code>VW **SumsOf8**(V v)</code> returns the sums of 8 consecutive
+    lanes, promoting each sum into a lane of `TFromV<VW>`. This is slower on
+    RVV/WASM.
+
+*   `V`: `{i,u}8`, `VW`: `Vec<RepartitionToWideX3<DFromV<V>>>` \
+    <code>VW **SumsOf8AbsDiff**(V a, V b)</code> returns the same result as
+    `SumsOf8(AbsDiff(a, b))`, but is more efficient on x86.
+
+*   `V`: `{i,u}8`, `VW`: `Vec<RepartitionToWide<DFromV<V>>>` \
+    <code>VW **SumsOfAdjQuadAbsDiff**&lt;int kAOffset, int kBOffset&gt;(V a,
+    V b)</code> returns the sums of the absolute differences of 32-bit blocks
+    of 8-bit integers, widened to `MakeWide<TFromV<V>>`.
+
+    `kAOffset` must be between `0` and
+    `HWY_MIN(1, (HWY_MAX_LANES_D(DFromV<V>) - 1)/4)`.
+
+    `kBOffset` must be between `0` and
+    `HWY_MIN(3, (HWY_MAX_LANES_D(DFromV<V>) - 1)/4)`.
+
+    SumsOfAdjQuadAbsDiff computes `|a[a_idx] - b[b_idx]| +
+    |a[a_idx+1] - b[b_idx+1]| + |a[a_idx+2] - b[b_idx+2]| +
+    |a[a_idx+3] - b[b_idx+3]|` for each lane `i` of the result, where `a_idx`
+    is equal to `kAOffset*4+((i/8)*16)+(i&7)` and where `b_idx` is equal to
+    `kBOffset*4+((i/8)*16)`.
+
+    If `Lanes(DFromV<V>()) < (8 << kAOffset)` is true, then
+    SumsOfAdjQuadAbsDiff returns implementation-defined values in any lanes
+    past the first (lowest-indexed) lane of the result vector.
+
+    SumsOfAdjQuadAbsDiff is only available if `HWY_TARGET != HWY_SCALAR`.
+
+*   `V`: `{i,u}8`, `VW`: `Vec<RepartitionToWide<DFromV<V>>>` \
+    <code>VW **SumsOfShuffledQuadAbsDiff**&lt;int kIdx3, int kIdx2, int kIdx1,
+    int kIdx0&gt;(V a, V b)</code> first shuffles `a` as if by the
+    `Per4LaneBlockShuffle<kIdx3, kIdx2, kIdx1, kIdx0>(BitCast(
+    RepartitionToWideX2<DFromV<V>>(), a))` operation, and then computes the sum
+    of absolute differences of 32-bit blocks of 8-bit integers taken from the
+    shuffled `a` vector and the `b` vector.
+
+    `kIdx0`, `kIdx1`, `kIdx2`, and `kIdx3` must be between 0 and 3.
+
+    SumsOfShuffledQuadAbsDiff computes `|a_shuf[a_idx] - b[b_idx]| +
+    |a_shuf[a_idx+1] - b[b_idx+1]| + |a_shuf[a_idx+2] - b[b_idx+2]| +
+    |a_shuf[a_idx+3] - b[b_idx+3]|` for each lane `i` of the result, where
+    `a_shuf` is equal to `BitCast(DFromV<V>(), Per4LaneBlockShuffle<kIdx3,
+    kIdx2, kIdx1, kIdx0>(BitCast(RepartitionToWideX2<DFromV<V>>(), a))`,
+    `a_idx` is equal to `(i/4)*8+(i&3)`, and `b_idx` is equal to `(i/2)*4`.
+
+    If `Lanes(DFromV<V>()) < 16` is true, SumsOfShuffledQuadAbsDiff returns
+    implementation-defined results in any lanes where
+    `(i/4)*8+(i&3)+3 >= Lanes(d)`.
+
+    The results of SumsOfAdjQuadAbsDiff are implementation-defined if
+    `kIdx0 >= Lanes(DFromV<V>()) / 4`.
+
+    The results of any lanes past the first (lowest-indexed) lane of
+    SumsOfAdjQuadAbsDiff are implementation-defined if
+    `kIdx1 >= Lanes(DFromV<V>()) / 4`.
+
+    SumsOfShuffledQuadAbsDiff is only available if `HWY_TARGET != HWY_SCALAR`.
 
 *   `V`: `{u,i}{8,16}` \
     <code>V **SaturatedAdd**(V a, V b)</code> returns `a[i] + b[i]` saturated to
@@ -524,9 +633,24 @@ from left to right, of the arguments passed to `Create{2-4}`.
 *   <code>V **Clamp**(V a, V lo, V hi)</code>: returns `a[i]` clamped to
     `[lo[i], hi[i]]`.
 
-*   `V`: `{f}` \
-    <code>V **operator/**(V a, V b)</code>: returns `a[i] / b[i]` in each lane.
+*   <code>V **operator/**(V a, V b)</code>: returns `a[i] / b[i]` in each lane.
     Currently unavailable on SVE/RVV; use the equivalent `Div` instead.
+
+    For integer vectors, `Div(a, b)` returns an implementation-defined value in
+    any lanes where `b[i] == 0`.
+
+    For signed integer vectors, `Div(a, b)` returns an implementation-defined
+    value in any lanes where `a[i] == LimitsMin<T>() && b[i] == -1`.
+
+*   `V`: `{u,i}` \
+    <code>V **operator%**(V a, V b)</code>: returns `a[i] % b[i]` in each lane.
+    Currently unavailable on SVE/RVV; use the equivalent `Mod` instead.
+
+    `Mod(a, b)` returns an implementation-defined value in any lanes where
+    `b[i] == 0`.
+
+    For signed integer vectors, `Mod(a, b)` returns an implementation-defined
+    value in any lanes where `a[i] == LimitsMin<T>() && b[i] == -1`.
 
 *   `V`: `{f}` \
     <code>V **Sqrt**(V a)</code>: returns `sqrt(a[i])`.
@@ -578,7 +702,7 @@ All other ops in this section are only available if `HWY_TARGET != HWY_SCALAR`:
     truncating it to the lower half for integer inputs. Currently unavailable on
     SVE/RVV; use the equivalent `Mul` instead.
 
-*   `V`: `i16` \
+*   `V`: `{u,i}` \
     <code>V **MulHigh**(V a, V b)</code>: returns the upper half of `a[i] *
     b[i]` in each lane.
 
@@ -588,13 +712,13 @@ All other ops in this section are only available if `HWY_TARGET != HWY_SCALAR`:
     multiplication result and storing the upper half. Results are
     implementation-defined iff both inputs are -32768.
 
-*   `V`: `{u,i}{8,16,32},u64` \
+*   `V`: `{u,i}` \
     <code>V2 **MulEven**(V a, V b)</code>: returns double-wide result of `a[i] *
     b[i]` for every even `i`, in lanes `i` (lower) and `i + 1` (upper). `V2` is
     a vector with double-width lanes, or the same as `V` for 64-bit inputs
     (which are only supported if `HWY_TARGET != HWY_SCALAR`).
 
-*   `V`: `{u,i}{8,16,32},u64` \
+*   `V`: `{u,i}` \
     <code>V **MulOdd**(V a, V b)</code>: returns double-wide result of `a[i] *
     b[i]` for every odd `i`, in lanes `i - 1` (lower) and `i` (upper). Only
     supported if `HWY_TARGET != HWY_SCALAR`.
@@ -603,16 +727,33 @@ All other ops in this section are only available if `HWY_TARGET != HWY_SCALAR`:
     <code>Vec&lt;D&gt; **WidenMulPairwiseAdd**(D d, V a, V b)</code>: widens `a`
     and `b` to `TFromD<D>` and computes `a[2*i+1]*b[2*i+1] + a[2*i+0]*b[2*i+0]`.
 
-*   `VI`: `i8`, `VU`: `Vec<RebindToUnsigned<DFromV<VI>>>`,
-    `DI`: `RepartitionToWide<DFromV<VI>>` \
+*   `VI`: `i8`, `VU`: `Vec<RebindToUnsigned<DFromV<VI>>>`, `DI`:
+    `RepartitionToWide<DFromV<VI>>` \
     <code>Vec&lt;DI&gt; **SatWidenMulPairwiseAdd**(DI di, VU a_u, VI b_i)
     </code>: widens `a_u` and `b_i` to `TFromD<DI>` and computes
     `a_u[2*i+1]*b_i[2*i+1] + a_u[2*i+0]*b_i[2*i+0]`, saturated to the range of
     `TFromD<D>`.
 
-*   `V`: `{bf,u,i}16`, `D`: `RepartitionToWide<DFromV<V>>`, `VW`: `Vec<D>` \
-    <code>VW **ReorderWidenMulAccumulate**(D d, V a, V b, VW sum0, VW&
-    sum1)</code>: widens `a` and `b` to `TFromD<D>`, then adds `a[i] * b[i]` to
+*   `DW`: `i32`, `D`: `Rebind<MakeNarrow<TFromD<DW>>, DW>`, `VW`: `Vec<DW>`,
+    `V`: `Vec<D>` \
+    <code>Vec&lt;D&gt; **SatWidenMulPairwiseAccumulate**(DW, V a, V b, VW sum)
+    </code>: widens `a[i]` and `b[i]` to `TFromD<DI>` and computes
+    `a[2*i]*b[2*i] + a[2*i+1]*b[2*i+1] + sum[i]`, saturated to the range of
+    `TFromD<DW>`.
+
+*   `DW`: `i32`, `D`: `Rebind<MakeNarrow<TFromD<DW>>, DW>`, `VW`: `Vec<DW>`,
+    `V`: `Vec<D>` \
+    <code>VW **SatWidenMulAccumFixedPoint**(DW, V a, V b, VW sum)**</code>:
+    First, widens `a` and `b` to `TFromD<DW>`, then adds `a[i] * b[i] * 2` to
+    `sum[i]`, saturated to the range of `TFromD<DW>`.
+
+    If `a[i] == LimitsMin<TFromD<D>>() && b[i] == LimitsMin<TFromD<D>>()`, it is
+    implementation-defined whether `a[i] * b[i] * 2` is first saturated to
+    `TFromD<DW>` prior to the addition of `a[i] * b[i] * 2` to `sum[i]`.
+
+*   `V`: `{bf,u,i}16`, `DW`: `RepartitionToWide<DFromV<V>>`, `VW`: `Vec<DW>` \
+    <code>VW **ReorderWidenMulAccumulate**(DW d, V a, V b, VW sum0, VW&
+    sum1)</code>: widens `a` and `b` to `TFromD<DW>`, then adds `a[i] * b[i]` to
     either `sum1[j]` or lane `j` of the return value, where `j = P(i)` and `P`
     is a permutation. The only guarantee is that `SumOfLanes(d,
     Add(return_value, sum1))` is the sum of all `a[i] * b[i]`. This is useful
@@ -635,19 +776,25 @@ All other ops in this section are only available if `HWY_TARGET != HWY_SCALAR`:
     Exception: if `HWY_TARGET == HWY_SCALAR`, returns `a[0]*b[0]`. Note that the
     initial value of `sum1` must be zero, see `ReorderWidenMulAccumulate`.
 
-*   `VN`: `{u,i}{8,16}`,
-    `D`: `RepartitionToWide<RepartitionToWide<DFromV<VN>>>` \
-    <code>Vec&lt;D&gt; **SumOfMulQuadAccumulate**(D d, VN a, VN b,
-    Vec&lt;D&gt; sum)</code>: widens `a` and `b` to `TFromD<D>` and computes
-    `sum[i] + a[4*i+3]*b[4*i+3] + a[4*i+2]*b[4*i+2] + a[4*i+1]*b[4*i+1] +
+*   `VN`: `{u,i}{8,16}`, `D`: `RepartitionToWideX2<DFromV<VN>>` \
+    <code>Vec&lt;D&gt; **SumOfMulQuadAccumulate**(D d, VN a, VN b, Vec&lt;D&gt;
+    sum)</code>: widens `a` and `b` to `TFromD<D>` and computes `sum[i] +
+    a[4*i+3]*b[4*i+3] + a[4*i+2]*b[4*i+2] + a[4*i+1]*b[4*i+1] +
     a[4*i+0]*b[4*i+0]`
 
-*   `VN_I`: `i8`, `VN_U`: `Vec<RebindToUnsigned<DFromV<VN_I>>>`,
-    `DI`: `Repartition<int32_t, DFromV<VN_I>>` \
+*   `VN_I`: `i8`, `VN_U`: `Vec<RebindToUnsigned<DFromV<VN_I>>>`, `DI`:
+    `Repartition<int32_t, DFromV<VN_I>>` \
     <code>Vec&lt;DI&gt; **SumOfMulQuadAccumulate**(DI di, VN_U a_u, VN_I b_i,
     Vec&lt;DI&gt; sum)</code>: widens `a` and `b` to `TFromD<DI>` and computes
     `sum[i] + a[4*i+3]*b[4*i+3] + a[4*i+2]*b[4*i+2] + a[4*i+1]*b[4*i+1] +
     a[4*i+0]*b[4*i+0]`
+
+*   `V`: `{u,i}{8,16,32},{f}16`, \
+    `VW`: `Vec<RepartitionToWide<DFromV<V>>`: \
+    `VW WidenMulAccumulate(D, V a, V b, VW low, VW& high)`: widens `a` and `b`,
+    multiplies them together, then adds them to the concatenated vectors
+    high:low. Returns the lower half of the result, and sets high to the upper
+    half.
 
 #### Fused multiply-add
 
@@ -660,11 +807,57 @@ variants are somewhat slower on Arm, and unavailable for integer inputs; if the
 
 *   <code>V **NegMulAdd**(V a, V b, V c)</code>: returns `-a[i] * b[i] + c[i]`.
 
-*   `V`: `{f}` \
-    <code>V **MulSub**(V a, V b, V c)</code>: returns `a[i] * b[i] - c[i]`.
+*   <code>V **MulSub**(V a, V b, V c)</code>: returns `a[i] * b[i] - c[i]`.
 
-*   `V`: `{f}` \
-    <code>V **NegMulSub**(V a, V b, V c)</code>: returns `-a[i] * b[i] - c[i]`.
+*   <code>V **NegMulSub**(V a, V b, V c)</code>: returns `-a[i] * b[i] - c[i]`.
+
+*   <code>V **MulAddSub**(V a, V b, V c)</code>: returns `a[i] * b[i] - c[i]` in
+    the even lanes and `a[i] * b[i] + c[i]` in the odd lanes.
+
+    `MulAddSub(a, b, c)` is equivalent to `OddEven(MulAdd(a, b, c), MulSub(a, b,
+    c))` or `MulAddSub(a, b, OddEven(c, Neg(c))`, but `MulSub(a, b, c)` is more
+    efficient on some targets (including AVX2/AVX3).
+
+*   `V`: `bf16`, `D`: `RepartitionToWide<DFromV<V>>`, `VW`: `Vec<D>` \
+    <code>VW **MulEvenAdd**(D d, V a, V b, VW c)</code>: equivalent to and
+    potentially more efficient than `MulAdd(PromoteEvenTo(d, a),
+    PromoteEvenTo(d, b), c)`.
+
+*   `V`: `bf16`, `D`: `RepartitionToWide<DFromV<V>>`, `VW`: `Vec<D>` \
+    <code>VW **MulOddAdd**(D d, V a, V b, VW c)</code>: equivalent to and
+    potentially more efficient than `MulAdd(PromoteOddTo(d, a), PromoteOddTo(d,
+    b), c)`.
+
+#### Masked arithmetic
+
+All ops in this section return `no` for `mask=false` lanes, and suppress any
+exceptions for those lanes if that is supported by the ISA. When exceptions are
+not a concern, these are equivalent to, and potentially more efficient than,
+`IfThenElse(m, Add(a, b), no);` etc.
+
+*   <code>V **MaskedMinOr**(V no, M m, V a, V b)</code>: returns `Min(a, b)[i]`
+    or `no[i]` if `m[i]` is false.
+*   <code>V **MaskedMaxOr**(V no, M m, V a, V b)</code>: returns `Max(a, b)[i]`
+    or `no[i]` if `m[i]` is false.
+*   <code>V **MaskedAddOr**(V no, M m, V a, V b)</code>: returns `a[i] + b[i]`
+    or `no[i]` if `m[i]` is false.
+*   <code>V **MaskedSubOr**(V no, M m, V a, V b)</code>: returns `a[i] - b[i]`
+    or `no[i]` if `m[i]` is false.
+*   <code>V **MaskedMulOr**(V no, M m, V a, V b)</code>: returns `a[i] * b[i]`
+    or `no[i]` if `m[i]` is false.
+*   <code>V **MaskedDivOr**(V no, M m, V a, V b)</code>: returns `a[i] / b[i]`
+    or `no[i]` if `m[i]` is false.
+*   `V`: `{u,i}` \
+    <code>V **MaskedModOr**(V no, M m, V a, V b)</code>: returns `a[i] % b[i]`
+    or `no[i]` if `m[i]` is false.
+*   `V`: `{u,i}{8,16}` \
+    <code>V **MaskedSatAddOr**(V no, M m, V a, V b)</code>: returns `a[i] +
+    b[i]` saturated to the minimum/maximum representable value, or `no[i]` if
+    `m[i]` is false.
+*   `V`: `{u,i}{8,16}` \
+    <code>V **MaskedSatSubOr**(V no, M m, V a, V b)</code>: returns `a[i] +
+    b[i]` saturated to the minimum/maximum representable value, or `no[i]` if
+    `m[i]` is false.
 
 #### Shifts
 
@@ -683,9 +876,13 @@ lane sizes, and `RotateRight` is often emulated with shifts:
 *   `V`: `{u,i}` \
     <code>V **ShiftRight**&lt;int&gt;(V a)</code> returns `a[i] >> int`.
 
-*   `V`: `{u}` \
-    <code>V **RotateRight**&lt;int&gt;(V a)</code> returns `(a[i] >> int) |
-    (a[i] << (sizeof(T)*8 - int))`.
+*   `V`: `{u,i}` \
+    <code>V **RotateLeft**&lt;int&gt;(V a)</code> returns `(a[i] << int) |
+    (static_cast<TU>(a[i]) >> (sizeof(T)*8 - int))`.
+
+*   `V`: `{u,i}` \
+    <code>V **RotateRight**&lt;int&gt;(V a)</code> returns
+    `(static_cast<TU>(a[i]) >> int) | (a[i] << (sizeof(T)*8 - int))`.
 
 Shift all lanes by the same (not necessarily compile-time constant) amount:
 
@@ -694,6 +891,18 @@ Shift all lanes by the same (not necessarily compile-time constant) amount:
 
 *   `V`: `{u,i}` \
     <code>V **ShiftRightSame**(V a, int bits)</code> returns `a[i] >> bits`.
+
+*   `V`: `{u,i}` \
+    <code>V **RotateLeftSame**(V a, int bits)</code> returns
+    `(a[i] << shl_bits) | (static_cast<TU>(a[i]) >>
+    (sizeof(T)*8 - shl_bits))`, where `shl_bits` is equal to
+    `bits & (sizeof(T)*8 - 1)`.
+
+*   `V`: `{u,i}` \
+    <code>V **RotateRightSame**(V a, int bits)</code> returns
+    `(static_cast<TU>(a[i]) >> shr_bits) | (a[i] >>
+    (sizeof(T)*8 - shr_bits))`, where `shr_bits` is equal to
+    `bits & (sizeof(T)*8 - 1)`.
 
 Per-lane variable shifts (slow if SSSE3/SSE4, or 16-bit, or Shr i64 on AVX2):
 
@@ -704,6 +913,18 @@ Per-lane variable shifts (slow if SSSE3/SSE4, or 16-bit, or Shr i64 on AVX2):
 *   `V`: `{u,i}` \
     <code>V **operator>>**(V a, V b)</code> returns `a[i] >> b[i]`. Currently
     unavailable on SVE/RVV; use the equivalent `Shr` instead.
+
+*   `V`: `{u,i}` \
+    <code>V **Rol**(V a, V b)</code> returns
+    `(a[i] << (b[i] & shift_amt_mask)) |
+    (static_cast<TU>(a[i]) >> ((sizeof(T)*8 - b[i]) & shift_amt_mask))`,
+    where `shift_amt_mask` is equal to `sizeof(T)*8 - 1`.
+
+*   `V`: `{u,i}` \
+    <code>V **Ror**(V a, V b)</code> returns
+    `(static_cast<TU>(a[i]) >> (b[i] & shift_amt_mask)) |
+    (a[i] << ((sizeof(T)*8 - b[i]) & shift_amt_mask))`, where `shift_amt_mask` is
+    equal to `sizeof(T)*8 - 1`.
 
 #### Floating-point rounding
 
@@ -728,6 +949,11 @@ Per-lane variable shifts (slow if SSSE3/SSE4, or 16-bit, or Shr i64 on AVX2):
 *   `V`: `{f}` \
     <code>M **IsNaN**(V v)</code>: returns mask indicating whether `v[i]` is
     "not a number" (unordered).
+
+*   `V`: `{f}` \
+    <code>M **IsEitherNaN**(V a, V b)</code>: equivalent to
+    `Or(IsNaN(a), IsNaN(b))`, but `IsEitherNaN(a, b)` is more efficient than
+    `Or(IsNaN(a), IsNaN(b))` on x86.
 
 *   `V`: `{f}` \
     <code>M **IsInf**(V v)</code>: returns mask indicating whether `v[i]` is
@@ -809,22 +1035,44 @@ Special functions for signed types:
     <code>V **CopySignToAbs**(V a, V b)</code>: as above, but potentially
     slightly more efficient; requires the first argument to be non-negative.
 
-*   `V`: `i32/64` \
+*   `V`: `{i}` \
     <code>V **BroadcastSignBit**(V a)</code> returns `a[i] < 0 ? -1 : 0`.
 
-*   `V`: `{f}` \
+*   `V`: `{i,f}` \
     <code>V **ZeroIfNegative**(V v)</code>: returns `v[i] < 0 ? 0 : v[i]`.
 
 *   `V`: `{i,f}` \
     <code>V **IfNegativeThenElse**(V v, V yes, V no)</code>: returns `v[i] < 0 ?
     yes[i] : no[i]`. This may be more efficient than `IfThenElse(Lt..)`.
 
+*   `V`: `{i,f}` \
+    <code>V **IfNegativeThenElseZero**(V v, V yes)</code>: returns
+    `v[i] < 0 ? yes[i] : 0`. `IfNegativeThenElseZero(v, yes)` is equivalent to
+    but more efficient than `IfThenElseZero(IsNegative(v), yes)` or
+    `IfNegativeThenElse(v, yes, Zero(d))` on some targets.
+
+*   `V`: `{i,f}` \
+    <code>V **IfNegativeThenZeroElse**(V v, V no)</code>: returns
+    `v[i] < 0 ? 0 : no`. `IfNegativeThenZeroElse(v, no)` is equivalent to
+    but more efficient than `IfThenZeroElse(IsNegative(v), no)` or
+    `IfNegativeThenElse(v, Zero(d), no)` on some targets.
+
+*   `V`: `{i,f}` \
+    <code>V **IfNegativeThenNegOrUndefIfZero**(V mask, V v)</code>: returns
+    `mask[i] < 0 ? (-v[i]) : ((mask[i] > 0) ? v[i] : impl_defined_val)`, where
+    `impl_defined_val` is an implementation-defined value that is equal to
+    either 0 or `v[i]`.
+
+    `IfNegativeThenNegOrUndefIfZero(mask, v)` is more efficient than
+    `IfNegativeThenElse(mask, Neg(v), v)` for I8/I16/I32 vectors that are
+    32 bytes or smaller on SSSE3/SSE4/AVX2/AVX3 targets.
+
 ### Masks
 
 Let `M` denote a mask capable of storing a logical true/false for each lane (the
 encoding depends on the platform).
 
-#### Creation
+#### Create mask
 
 *   <code>M **FirstN**(D, size_t N)</code>: returns mask with the first `N`
     lanes (those with index `< N`) true. `N >= Lanes(D())` results in an
@@ -843,7 +1091,20 @@ encoding depends on the platform).
     readable, but only `(Lanes(D()) + 7) / 8` need be initialized. Any unused
     bits (happens if `Lanes(D()) < 8`) are treated as if they were zero.
 
-#### Conversion
+*   <code>M **Dup128MaskFromMaskBits**(D d, unsigned mask_bits)</code>: returns
+    a mask with lane `i` set to
+    `((mask_bits >> (i & (16 / sizeof(T) - 1))) & 1) != 0`.
+
+*   <code>M **MaskFalse(D)**</code>: returns an all-false mask.
+    `MaskFalse(D())` is equivalent to `MaskFromVec(Zero(D()))`, but
+    `MaskFalse(D())` is more efficient than `MaskFromVec(Zero(D()))` on AVX3,
+    RVV, and SVE.
+
+    `MaskFalse(D())` is also equivalent to `FirstN(D(), 0)` or
+    `Dup128MaskFromMaskBits(D(), 0)`, but `MaskFalse(D())` is usually more
+    efficient.
+
+#### Convert mask
 
 *   <code>M1 **RebindMask**(D, M2 m)</code>: returns same mask bits as `m`, but
     reinterpreted as a mask for lanes of type `TFromD<D>`. `M1` and `M2` must
@@ -858,7 +1119,109 @@ encoding depends on the platform).
     next byte. Returns the number of bytes written: `(Lanes(D()) + 7) / 8`. At
     least 8 bytes of `p` must be writable.
 
-#### Testing
+*   <code>Mask&lt;DTo&gt; **PromoteMaskTo**(DTo d_to, DFrom d_from,
+    Mask&lt;DFrom&gt; m)</code>: Promotes `m` to a mask with a lane type of
+    `TFromD<DTo>`, `DFrom` is `Rebind<TFrom, DTo>`.
+
+    `PromoteMaskTo(d_to, d_from, m)` is equivalent to
+    `MaskFromVec(BitCast(d_to, PromoteTo(di_to, BitCast(di_from,
+    VecFromMask(d_from, m)))))`, where `di_from` is `RebindToSigned<DFrom>()`
+    and `di_from` is `RebindToSigned<DFrom>()`, but
+    `PromoteMaskTo(d_to, d_from, m)` is more efficient on some targets.
+
+    PromoteMaskTo requires that `sizeof(TFromD<DFrom>) < sizeof(TFromD<DTo>)` be
+    true.
+
+*   <code>Mask&lt;DTo&gt; **DemoteMaskTo**(DTo d_to, DFrom d_from,
+    Mask&lt;DFrom&gt; m)</code>: Demotes `m` to a mask with a lane type of
+    `TFromD<DTo>`, `DFrom` is `Rebind<TFrom, DTo>`.
+
+    `DemoteMaskTo(d_to, d_from, m)` is equivalent to
+    `MaskFromVec(BitCast(d_to, DemoteTo(di_to, BitCast(di_from,
+    VecFromMask(d_from, m)))))`, where `di_from` is `RebindToSigned<DFrom>()`
+    and `di_from` is `RebindToSigned<DFrom>()`, but
+    `DemoteMaskTo(d_to, d_from, m)` is more efficient on some targets.
+
+    DemoteMaskTo requires that `sizeof(TFromD<DFrom>) > sizeof(TFromD<DTo>)` be
+    true.
+
+*   <code>M **OrderedDemote2MasksTo**(DTo, DFrom, M2, M2)</code>: returns a mask
+    whose `LowerHalf` is the first argument and whose `UpperHalf` is the second
+    argument; `M2` is `Mask<Half<DFrom>>`; `DTo` is `Repartition<TTo, DFrom>`.
+
+    OrderedDemote2MasksTo requires that
+    `sizeof(TFromD<DTo>) == sizeof(TFromD<DFrom>) * 2` be true.
+
+    `OrderedDemote2MasksTo(d_to, d_from, a, b)` is equivalent to
+    `MaskFromVec(BitCast(d_to, OrderedDemote2To(di_to, va, vb)))`, where `va` is
+    `BitCast(di_from, MaskFromVec(d_from, a))`, `vb` is
+    `BitCast(di_from, MaskFromVec(d_from, b))`, `di_to` is
+    `RebindToSigned<DTo>()`, and `di_from` is `RebindToSigned<DFrom>()`, but
+    `OrderedDemote2MasksTo(d_to, d_from, a, b)` is more efficient on some
+    targets.
+
+    OrderedDemote2MasksTo is only available if `HWY_TARGET != HWY_SCALAR` is
+    true.
+
+#### Combine mask
+
+*   <code>M2 **LowerHalfOfMask**(D d, M m)</code>:
+    returns the lower half of mask `m`, where `M` is `MFromD<Twice<D>>`
+    and `M2` is `MFromD<D>`.
+
+    `LowerHalfOfMask(d, m)` is equivalent to
+    `MaskFromVec(LowerHalf(d, VecFromMask(d, m)))`,
+    but `LowerHalfOfMask(d, m)` is more efficient on some targets.
+
+*   <code>M2 **UpperHalfOfMask**(D d, M m)</code>:
+    returns the upper half of mask `m`, where `M` is `MFromD<Twice<D>>`
+    and `M2` is `MFromD<D>`.
+
+    `UpperHalfOfMask(d, m)` is equivalent to
+    `MaskFromVec(UpperHalf(d, VecFromMask(d, m)))`,
+    but `UpperHalfOfMask(d, m)` is more efficient on some targets.
+
+    UpperHalfOfMask is only available if `HWY_TARGET != HWY_SCALAR` is true.
+
+*   <code>M **CombineMasks**(D, M2, M2)</code>: returns a mask whose `UpperHalf`
+    is the first argument and whose `LowerHalf` is the second argument; `M2` is
+    `Mask<Half<D>>`.
+
+    `CombineMasks(d, hi, lo)` is equivalent to `MaskFromVec(d, Combine(d,
+    VecFromMask(Half<D>(), hi), VecFromMask(Half<D>(), lo)))`, but
+    `CombineMasks(d, hi, lo)` is more efficient on some targets.
+
+    CombineMasks is only available if `HWY_TARGET != HWY_SCALAR` is true.
+
+#### Slide mask across blocks
+
+*   <code>M **SlideMaskUpLanes**(D d, M m, size_t N)</code>:
+    Slides `m` up `N` lanes. `SlideMaskUpLanes(d, m, N)` is equivalent to
+    `MaskFromVec(SlideUpLanes(d, VecFromMask(d, m), N))`, but
+    `SlideMaskUpLanes(d, m, N)` is more efficient on some targets.
+
+    The results of SlideMaskUpLanes is implementation-defined if
+    `N >= Lanes(d)`.
+
+*   <code>M **SlideMaskDownLanes**(D d, M m, size_t N)</code>:
+    Slides `m` down `N` lanes. `SlideMaskDownLanes(d, m, N)` is equivalent to
+    `MaskFromVec(SlideDownLanes(d, VecFromMask(d, m), N))`, but
+    `SlideMaskDownLanes(d, m, N)` is more efficient on some targets.
+
+    The results of SlideMaskDownLanes is implementation-defined if
+    `N >= Lanes(d)`.
+
+*   <code>M **SlideMask1Up**(D d, M m)</code>:
+    Slides `m` up 1 lane. `SlideMask1Up(d, m)` is equivalent to
+    `MaskFromVec(Slide1Up(d, VecFromMask(d, m)))`, but `SlideMask1Up(d, m)` is
+     more efficient on some targets.
+
+*   <code>M **SlideMask1Down**(D d, M m)</code>:
+    Slides `m` down 1 lane. `SlideMask1Down(d, m)` is equivalent to
+    `MaskFromVec(Slide1Down(d, VecFromMask(d, m)))`, but `SlideMask1Down(d, m)` is
+    more efficient on some targets.
+
+#### Test mask
 
 *   <code>bool **AllTrue**(D, M m)</code>: returns whether all `m[i]` are true.
 
@@ -884,7 +1247,7 @@ encoding depends on the platform).
     otherwise results are undefined. This is typically more efficient than
     `FindLastTrue`.
 
-#### Ternary operator
+#### Ternary operator for masks
 
 For `IfThen*`, masks must adhere to the invariant established by `MaskFromVec`:
 false is zero, true has all bits set:
@@ -902,7 +1265,7 @@ false is zero, true has all bits set:
     possibly faster than `IfVecThenElse(MaskFromVec(mask), yes, no)`. The result
     is *implementation-defined* if `mask[i]` is neither zero nor all bits set.
 
-#### Logical
+#### Logical mask
 
 *   <code>M **Not**(M m)</code>: returns mask of elements indicating whether the
     input mask element was false.
@@ -1021,6 +1384,12 @@ These return a mask (see above) indicating whether the condition is true.
 
 *   <code>M **operator&gt;=**(V a, V b)</code>: returns `a[i] >= b[i]`.
     Currently unavailable on SVE/RVV; use the equivalent `Ge` instead.
+
+*   `V`: `{i,f}` \
+    <code>M **IsNegative**(V v)</code>: returns `v[i] < 0`.
+
+    `IsNegative(v)` is equivalent to `MaskFromVec(BroadcastSignBit(v))` or
+    `Lt(v, Zero(d))`, but `IsNegative(v)` is more efficient on some targets.
 
 *   `V`: `{u,i}` \
     <code>M **TestBit**(V v, V bit)</code>: returns `(v[i] & bit[i]) == bit[i]`.
@@ -1197,12 +1566,18 @@ aligned memory at indices which are not a multiple of the vector length):
 #### Scatter/Gather
 
 **Note**: Offsets/indices are of type `VI = Vec<RebindToSigned<D>>` and need not
-be unique. The results are implementation-defined if any are negative.
+be unique. The results are implementation-defined for negative offsets, because
+behavior differs between x86 and RVV (signed vs. unsigned).
 
 **Note**: Where possible, applications should `Load/Store/TableLookup*` entire
 vectors, which is much faster than `Scatter/Gather`. Otherwise, code of the form
 `dst[tbl[i]] = F(src[i])` should when possible be transformed to `dst[i] =
-F(src[tbl[i]])` because `Scatter` is more expensive than `Gather`.
+F(src[tbl[i]])` because `Scatter` may be more expensive than `Gather`.
+
+**Note**: We provide `*Offset` functions for the convenience of users that have
+actual byte offsets. However, the preferred interface is `*Index`, which takes
+indices. To reduce the number of ops, we do not intend to add `Masked*` ops for
+offsets. If you have offsets, you can convert them to indices via `ShiftRight`.
 
 *   `D`: `{u,i,f}{32,64}` \
     <code>void **ScatterOffset**(Vec&lt;D&gt; v, D, T* base, VI offsets)</code>:
@@ -1213,8 +1588,9 @@ F(src[tbl[i]])` because `Scatter` is more expensive than `Gather`.
     stores `v[i]` to `base[indices[i]]`.
 
 *   `D`: `{u,i,f}{32,64}` \
-    <code>void **ScatterIndexN**(Vec&lt;D&gt; v, D, T* base, VI indices, size_t max_lanes_to_store)</code>:
-    Stores `HWY_MIN(Lanes(d), max_lanes_to_store)` lanes `v[i]` to `base[indices[i]]`
+    <code>void **ScatterIndexN**(Vec&lt;D&gt; v, D, T* base, VI indices, size_t
+    max_lanes_to_store)</code>: Stores `HWY_MIN(Lanes(d), max_lanes_to_store)`
+    lanes `v[i]` to `base[indices[i]]`
 
 *   `D`: `{u,i,f}{32,64}` \
     <code>void **MaskedScatterIndex**(Vec&lt;D&gt; v, M m, D, T* base, VI
@@ -1230,17 +1606,23 @@ F(src[tbl[i]])` because `Scatter` is more expensive than `Gather`.
     returns vector of `base[indices[i]]`.
 
 *   `D`: `{u,i,f}{32,64}` \
-    <code>Vec&lt;D&gt; **GatherIndexN**(D, const T* base, VI indices, size_t max_lanes_to_load)</code>:
-    Loads `HWY_MIN(Lanes(d), max_lanes_to_load)` lanes of `base[indices[i]]`
-    to the first (lowest-index) lanes of the result vector and zeroes
-    out the remaining lanes.
+    <code>Vec&lt;D&gt; **GatherIndexN**(D, const T* base, VI indices, size_t
+    max_lanes_to_load)</code>: Loads `HWY_MIN(Lanes(d), max_lanes_to_load)`
+    lanes of `base[indices[i]]` to the first (lowest-index) lanes of the result
+    vector and zeroes out the remaining lanes.
+
+*   `D`: `{u,i,f}{32,64}` \
+    <code>Vec&lt;D&gt; **MaskedGatherIndexOr**(V no, M mask, D d, const T* base,
+    VI indices)</code>: returns vector of `base[indices[i]]` where `mask[i]` is
+    true, otherwise `no[i]`. Does not fault for lanes whose `mask` is false.
+    This is equivalent to, and potentially more efficient than,
+    `IfThenElseZero(mask, GatherIndex(d, base, indices))`.
 
 *   `D`: `{u,i,f}{32,64}` \
     <code>Vec&lt;D&gt; **MaskedGatherIndex**(M mask, D d, const T* base, VI
-    indices)</code>: returns vector of `base[indices[i]]` where `mask[i]` is
-    true, otherwise zero. Does not fault for lanes whose `mask` is false. This
-    is equivalent to, and potentially more efficient than, `IfThenElseZero(mask,
-    GatherIndex(d, base, indices))`.
+    indices)</code>: equivalent to `MaskedGatherIndexOr(Zero(d), mask, d, base,
+    indices)`. Use this when the desired default value is zero; it may be more
+    efficient on some targets, and on others require generating a zero constant.
 
 ### Cache control
 
@@ -1306,6 +1688,12 @@ All functions except `Stream` are defined in cache_control.h.
     zero and converts the value to same-sized signed/unsigned integer. Returns
     the closest representable value if the input exceeds the destination range.
 
+*   `V`: `{f}` \
+    <code>Vec&lt;D&gt; **ConvertInRangeTo**(D, V)</code>: rounds floating point
+    towards zero and converts the value to same-sized signed/unsigned integer.
+    Returns an implementation-defined value if the input exceeds the destination
+    range.
+
 *   `V`: `f32`; `Ret`: `i32` \
     <code>Ret **NearestInt**(V a)</code>: returns the integer nearest to `a[i]`;
     results are undefined for NaN.
@@ -1337,11 +1725,16 @@ obtain the `D` that describes the return type.
     towards zero and converts the value to 32-bit integers. Returns the closest
     representable value if the input exceeds the destination range.
 
+*   `V`,`D`: `f64,{u,i}32` \
+    <code>Vec&lt;D&gt; **DemoteInRangeTo**(D, V v)</code>: rounds floating point
+    towards zero and converts the value to 32-bit integers. Returns an
+    implementation-defined value if the input exceeds the destination range.
+
 *   `V`,`D`: `{u,i}64,f32` \
     <code>Vec&lt;D&gt; **DemoteTo**(D, V v)</code>: converts 64-bit integer to
     `float`.
 
-*   `V`,`D`: (`f32,f16`), (`f32,bf16`) \
+*   `V`,`D`: (`f32,f16`), (`f64,f16`), (`f32,bf16`) \
     <code>Vec&lt;D&gt; **DemoteTo**(D, V v)</code>: narrows float to half (for
     bf16, it is unspecified whether this truncates or rounds).
 
@@ -1351,7 +1744,7 @@ These functions promote a half vector to a full vector. To obtain halves, use
 `LowerHalf` or `UpperHalf`, or load them using a half-sized `D`.
 
 *   Unsigned `V` to wider signed/unsigned `D`; signed to wider signed, `f16` to
-    `f32`, `bf16` to `f32`, `f32` to `f64` \
+    `f32`, `f16` to `f64`, `bf16` to `f32`, `f32` to `f64` \
     <code>Vec&lt;D&gt; **PromoteTo**(D, V part)</code>: returns `part[i]` zero-
     or sign-extended to the integer type `MakeWide<T>`, or widened to the
     floating-point type `MakeFloat<MakeWide<T>>`.
@@ -1364,6 +1757,12 @@ These functions promote a half vector to a full vector. To obtain halves, use
     <code>Vec&lt;D&gt; **PromoteTo**(D, V part)</code>: rounds `part[i]` towards
     zero and converts the rounded value to a 64-bit signed or unsigned integer.
     Returns the representable value if the input exceeds the destination range.
+
+*   `f32` to `i64` or `u64` \
+    <code>Vec&lt;D&gt; **PromoteInRangeTo**(D, V part)</code>: rounds `part[i]`
+    towards zero and converts the rounded value to a 64-bit signed or unsigned
+    integer. Returns an implementation-defined value if the input exceeds the
+    destination range.
 
 The following may be more convenient or efficient than also calling `LowerHalf`
 / `UpperHalf`:
@@ -1385,6 +1784,13 @@ The following may be more convenient or efficient than also calling `LowerHalf`
     for i in `[0, Lanes(D()))`. Note that `V` has twice as many lanes as `D` and
     the return value.
 
+*   `f32` to `i64` or `u64` \
+    <code>Vec&lt;D&gt; **PromoteInRangeLowerTo**(D, V v)</code>: rounds `v[i]`
+    towards zero and converts the rounded value to a 64-bit signed or unsigned
+    integer, for i in `[0, Lanes(D()))`. Note that `V` has twice as many lanes
+    as `D` and the return value. Returns an implementation-defined value if the
+    input exceeds the destination range.
+
 *   Unsigned `V` to wider signed/unsigned `D`; signed to wider signed, `f16` to
     `f32`, `bf16` to `f32`, `f32` to `f64` \
     <code>Vec&lt;D&gt; **PromoteUpperTo**(D, V v)</code>: returns `v[i]` widened
@@ -1404,6 +1810,45 @@ The following may be more convenient or efficient than also calling `LowerHalf`
     for i in `[Lanes(D()), 2 * Lanes(D()))`. Note that `V` has twice as many
     lanes as `D` and the return value. Only available if
     `HWY_TARGET != HWY_SCALAR`.
+
+*   `f32` to `i64` or `u64` \
+    <code>Vec&lt;D&gt; **PromoteInRangeUpperTo**(D, V v)</code>: rounds `v[i]`
+    towards zero and converts the rounded value to a 64-bit signed or unsigned
+    integer, for i in `[Lanes(D()), 2 * Lanes(D()))`. Note that `V` has twice as
+    many lanes as `D` and the return value. Returns an implementation-defined
+    value if the input exceeds the destination range. Only available if
+    `HWY_TARGET != HWY_SCALAR`.
+
+The following may be more convenient or efficient than also calling `ConcatEven`
+or `ConcatOdd` followed by `PromoteLowerTo`:
+
+*   `V`:`{u,i}{8,16,32},f{16,32},bf16`, `D`:`RepartitionToWide<DFromV<V>>` \
+    <code>Vec&lt;D&gt; **PromoteEvenTo**(D, V v)</code>: promotes the even lanes
+    of `v` to `TFromD<D>`. Note that `V` has twice as many lanes as `D` and the
+    return value. `PromoteEvenTo(d, v)` is equivalent to, but potentially more
+    efficient than `PromoteLowerTo(d, ConcatEven(Repartition<TFromV<V>, D>(), v,
+    v))`.
+
+*   `V`:`{u,i}{8,16,32},f{16,32},bf16`, `D`:`RepartitionToWide<DFromV<V>>` \
+    <code>Vec&lt;D&gt; **PromoteOddTo**(D, V v)</code>: promotes the odd lanes
+    of `v` to `TFromD<D>`. Note that `V` has twice as many lanes as `D` and the
+    return value. `PromoteOddTo(d, v)` is equivalent to, but potentially more
+    efficient than `PromoteLowerTo(d, ConcatOdd(Repartition<TFromV<V>, D>(), v,
+    v))`. Only available if `HWY_TARGET != HWY_SCALAR`.
+
+*   `V`:`f32`, `D`:`{u,i}64` \
+    <code>Vec&lt;D&gt; **PromoteInRangeEvenTo**(D, V v)</code>: promotes the
+    even lanes of `v` to `TFromD<D>`. Note that `V` has twice as many lanes as
+    `D` and the return value. `PromoteInRangeEvenTo(d, v)` is equivalent to, but
+    potentially more efficient than `PromoteInRangeLowerTo(d, ConcatEven(
+    Repartition<TFromV<V>, D>(), v, v))`.
+
+*   `V`:`f32`, `D`:`{u,i}64` \
+    <code>Vec&lt;D&gt; **PromoteInRangeOddTo**(D, V v)</code>: promotes the odd
+    lanes of `v` to `TFromD<D>`. Note that `V` has twice as many lanes as `D`
+    and the return value. `PromoteInRangeOddTo(d, v)` is equivalent to, but
+    potentially more efficient than `PromoteInRangeLowerTo(d, ConcatOdd(
+    Repartition<TFromV<V>, D>(), v, v))`.
 
 #### Two-vector demotion
 
@@ -1483,6 +1928,15 @@ more expensive on AVX2/AVX-512 than per-block operations.
 *   <code>V **ConcatEven**(D, V hi, V lo)</code>: returns the concatenation of
     the even lanes of `hi` and the even lanes of `lo`.
 
+*   <code>V **InterleaveWholeLower**([D, ] V a, V b)</code>: returns
+    alternating lanes from the lower halves of `a` and `b` (`a[0]` in the
+    least-significant lane). The optional `D` (provided for consistency with
+    `InterleaveWholeUpper`) is `DFromV<V>`.
+
+*   <code>V **InterleaveWholeUpper**(D, V a, V b)</code>: returns
+    alternating lanes from the upper halves of `a` and `b` (`a[N/2]` in the
+    least-significant lane). `D` is `DFromV<V>`.
+
 ### Blockwise
 
 **Note**: if vectors are larger than 128 bits, the following operations split
@@ -1512,6 +1966,31 @@ All other ops in this section are only available if `HWY_TARGET != HWY_SCALAR`:
     to 0. `VI` are integers, possibly of a different type than those in `V`. The
     number of lanes in `V` and `VI` may differ.
 
+*   `V`: `{u,i}64`, `VI`: `{u,i}8` \
+    <code>V **BitShuffle**(V vals, VI indices)</code>: returns a
+    vector with `(vals[i] >> indices[i*8+j]) & 1` in bit `j` of `r[i]` for each
+    `j` between 0 and 7.
+
+    `BitShuffle(vals, indices)` zeroes out the upper 56 bits of `r[i]`.
+
+    If `indices[i*8+j]` is less than 0 or greater than 63, bit `j` of `r[i]` is
+    implementation-defined.
+
+    `VI` must be either `Vec<Repartition<int8_t, DFromV<V>>>` or
+    `Vec<Repartition<uint8_t, DFromV<V>>>`.
+
+    `BitShuffle(v, indices)` is equivalent to the following loop (where `N` is
+    equal to `Lanes(DFromV<V>())`):
+    ```
+    for(size_t i = 0; i < N; i++) {
+      uint64_t shuf_result = 0;
+      for(int j = 0; j < 7; j++) {
+        shuf_result |= ((v[i] >> indices[i*8+j]) & 1) << j;
+      }
+      r[i] = shuf_result;
+    }
+    ```
+
 #### Interleave
 
 Ops in this section are only available if `HWY_TARGET != HWY_SCALAR`:
@@ -1524,6 +2003,25 @@ Ops in this section are only available if `HWY_TARGET != HWY_SCALAR`:
 *   <code>V **InterleaveUpper**(D, V a, V b)</code>: returns *blocks* with
     alternating lanes from the upper halves of `a` and `b` (`a[N/2]` in the
     least-significant lane). `D` is `DFromV<V>`.
+
+*   <code>V **InterleaveEven**([D, ] V a, V b)</code>: returns alternating lanes
+    from the even lanes of `a` and `b` (`a[0]` in the least-significant lane,
+    followed by `b[0]`, followed by `a[2]`, followed by `b[2]`, and so on). The
+    optional `D` (provided for consistency with `InterleaveOdd`) is `DFromV<V>`.
+    Note that no lanes move across block boundaries.
+
+    `InterleaveEven(a, b)` and `InterleaveEven(d, a, b)` are both equivalent to
+    `OddEven(DupEven(b), a)`, but `InterleaveEven(a, b)` is usually more
+    efficient than `OddEven(DupEven(b), a)`.
+
+*   <code>V **InterleaveOdd**(D, V a, V b)</code>: returns alternating lanes
+    from the odd lanes of `a` and `b` (`a[1]` in the least-significant lane,
+    followed by `b[1]`, followed by `a[3]`, followed by `b[3]`, and so on). `D`
+    is `DFromV<V>`. Note that no lanes move across block boundaries.
+
+    `InterleaveOdd(d, a, b)` is equivalent to `OddEven(b, DupOdd(a))`, but
+    `InterleaveOdd(d, a, b)` is usually more efficient than `OddEven(b,
+    DupOdd(a))`.
 
 #### Zip
 
@@ -1540,7 +2038,7 @@ Ops in this section are only available if `HWY_TARGET != HWY_SCALAR`:
     `RepartitionToWide<DFromV<V>>`. Only available if `HWY_TARGET !=
     HWY_SCALAR`.
 
-#### Shift
+#### Shift within blocks
 
 Ops in this section are only available if `HWY_TARGET != HWY_SCALAR`:
 
@@ -1572,7 +2070,18 @@ Ops in this section are only available if `HWY_TARGET != HWY_SCALAR`:
     `hi[i] || lo[i]` right by `int` lanes \[1, 16/sizeof(T)). `D` is
     `DFromV<V>`.
 
-#### Shuffle
+#### Other fixed-pattern permutations within blocks
+
+*   <code>V **OddEven**(V a, V b)</code>: returns a vector whose odd lanes are
+    taken from `a` and the even lanes from `b`.
+
+*   <code>V **DupEven**(V v)</code>: returns `r`, the result of copying even
+    lanes to the next higher-indexed lane. For each even lane index `i`,
+    `r[i] == v[i]` and `r[i + 1] == v[i]`.
+
+*   <code>V **DupOdd**(V v)</code>: returns `r`, the result of copying odd lanes
+    to the previous lower-indexed lane. For each odd lane index `i`, `r[i] ==
+    v[i]` and `r[i - 1] == v[i]`. Only available if `HWY_TARGET != HWY_SCALAR`.
 
 Ops in this section are only available if `HWY_TARGET != HWY_SCALAR`:
 
@@ -1605,19 +2114,34 @@ instead because they are more general:
 
 ### Swizzle
 
-*   <code>V **OddEven**(V a, V b)</code>: returns a vector whose odd lanes are
-    taken from `a` and the even lanes from `b`.
+#### Reverse
 
-*   <code>V **OddEvenBlocks**(V a, V b)</code>: returns a vector whose odd
-    blocks are taken from `a` and the even blocks from `b`. Returns `b` if the
-    vector has no more than one block (i.e. is 128 bits or scalar).
-
-*   <code>V **DupEven**(V v)</code>: returns `r`, the result of copying even
-    lanes to the next higher-indexed lane. For each even lane index `i`,
-    `r[i] == v[i]` and `r[i + 1] == v[i]`.
+*   <code>V **Reverse**(D, V a)</code> returns a vector with lanes in reversed
+    order (`out[i] == a[Lanes(D()) - 1 - i]`).
 
 *   <code>V **ReverseBlocks**(V v)</code>: returns a vector with blocks in
     reversed order.
+
+The following `ReverseN` must not be called if `Lanes(D()) < N`:
+
+*   <code>V **Reverse2**(D, V a)</code> returns a vector with each group of 2
+    contiguous lanes in reversed order (`out[i] == a[i ^ 1]`).
+
+*   <code>V **Reverse4**(D, V a)</code> returns a vector with each group of 4
+    contiguous lanes in reversed order (`out[i] == a[i ^ 3]`).
+
+*   <code>V **Reverse8**(D, V a)</code> returns a vector with each group of 8
+    contiguous lanes in reversed order (`out[i] == a[i ^ 7]`).
+
+*   `V`: `{u,i}{16,32,64}` \
+    <code>V **ReverseLaneBytes**(V a)</code> returns a vector where the bytes of
+    each lane are swapped.
+
+*   `V`: `{u,i}` \
+    <code>V **ReverseBits**(V a)</code> returns a vector where the bits of each
+    lane are reversed.
+
+#### User-specified permutation across blocks
 
 *   <code>V **TableLookupLanes**(V a, unspecified)</code> returns a vector of
     `a[indices[i]]`, where `unspecified` is the return value of
@@ -1655,30 +2179,6 @@ instead because they are more general:
     must be in the range `[0, 2 * Lanes(d))` but need not be unique. The index
     type `TI` must be an integer of the same size as `TFromD<D>`.
 
-*   <code>V **BroadcastBlock**&lt;int kBlock&gt;(V v)</code>: broadcasts the
-    16-byte block of vector `v` at index `kBlock` to all of the blocks of the
-    result vector if `Lanes(DFromV<V>()) * sizeof(TFromV<V>) > 16` is true.
-    Otherwise, if `Lanes(DFromV<V>()) * sizeof(TFromV<V>) <= 16` is true,
-    returns `v`.
-
-    `kBlock` must be in `[0, DFromV<V>().MaxBlocks())`.
-
-*   <code>V **BroadcastLane**&lt;int kLane&gt;(V v)</code>: returns a vector
-    with all of the lanes set to `v[kLane]`.
-
-    `kLane` must be in `[0, MaxLanes(DFromV<V>()))`.
-
-*   <code>V **Reverse**(D, V a)</code> returns a vector with lanes in reversed
-    order (`out[i] == a[Lanes(D()) - 1 - i]`).
-
-*   `V`: `{u,i}{16,32,64}` \
-    <code>V **ReverseLaneBytes**(V a)</code> returns a vector where the bytes of
-    each lane are swapped.
-
-*   `V`: `{u,i}` \
-    <code>V **ReverseBits**(V a)</code> returns a vector where the bits of each
-    lane are reversed.
-
 *   <code>V **Per4LaneBlockShuffle**&lt;size_t kIdx3, size_t kIdx2, size_t
     kIdx1, size_t kIdx0&gt;(V v)</code> does a per 4-lane block shuffle of `v`
     if `Lanes(DFromV<V>())` is greater than or equal to 4 or a shuffle of the
@@ -1700,6 +2200,8 @@ instead because they are more general:
     Per4LaneBlockShuffle returns an unspecified value in the second lane of the
     result. Otherwise, Per4LaneBlockShuffle returns `v[kIdx1]` in the first lane
     of the result.
+
+#### Slide across blocks
 
 *   <code>V **SlideUpLanes**(D d, V v, size_t N)</code>: slides up `v` by `N`
     lanes
@@ -1770,51 +2272,52 @@ instead because they are more general:
     The results of `SlideDownBlocks<kBlocks>(d, v)` is implementation-defined if
     `kBlocks >= Blocks(d)` is true.
 
-The following `ReverseN` must not be called if `Lanes(D()) < N`:
+#### Other fixed-pattern across blocks
 
-*   <code>V **Reverse2**(D, V a)</code> returns a vector with each group of 2
-    contiguous lanes in reversed order (`out[i] == a[i ^ 1]`).
+*   <code>V **BroadcastLane**&lt;int kLane&gt;(V v)</code>: returns a vector
+    with all of the lanes set to `v[kLane]`.
 
-*   <code>V **Reverse4**(D, V a)</code> returns a vector with each group of 4
-    contiguous lanes in reversed order (`out[i] == a[i ^ 3]`).
+    `kLane` must be in `[0, MaxLanes(DFromV<V>()))`.
 
-*   <code>V **Reverse8**(D, V a)</code> returns a vector with each group of 8
-    contiguous lanes in reversed order (`out[i] == a[i ^ 7]`).
+*   <code>V **BroadcastBlock**&lt;int kBlock&gt;(V v)</code>: broadcasts the
+    16-byte block of vector `v` at index `kBlock` to all of the blocks of the
+    result vector if `Lanes(DFromV<V>()) * sizeof(TFromV<V>) > 16` is true.
+    Otherwise, if `Lanes(DFromV<V>()) * sizeof(TFromV<V>) <= 16` is true,
+    returns `v`.
 
-All other ops in this section are only available if `HWY_TARGET != HWY_SCALAR`:
+    `kBlock` must be in `[0, DFromV<V>().MaxBlocks())`.
 
-*   <code>V **DupOdd**(V v)</code>: returns `r`, the result of copying odd lanes
-    to the previous lower-indexed lane. For each odd lane index `i`, `r[i] ==
-    v[i]` and `r[i - 1] == v[i]`.
+*   <code>V **OddEvenBlocks**(V a, V b)</code>: returns a vector whose odd
+    blocks are taken from `a` and the even blocks from `b`. Returns `b` if the
+    vector has no more than one block (i.e. is 128 bits or scalar).
 
 *   <code>V **SwapAdjacentBlocks**(V v)</code>: returns a vector where blocks of
     index `2*i` and `2*i+1` are swapped. Results are undefined for vectors with
-    less than two blocks; callers must first check that via `Lanes`.
+    less than two blocks; callers must first check that via `Lanes`. Only
+    available if `HWY_TARGET != HWY_SCALAR`.
 
 ### Reductions
 
-**Note**: these 'reduce' all lanes to a single result (e.g. sum), which is
-broadcasted to all lanes. To obtain a scalar, you can call `GetLane`.
+**Note**: Horizontal operations (across lanes of the same vector) such as
+reductions are slower than normal SIMD operations and are typically used outside
+critical loops.
 
-Being a horizontal operation (across lanes of the same vector), these are slower
-than normal SIMD operations and are typically used outside critical loops.
+The following broadcast the result to all lanes. To obtain a scalar, you can
+call `GetLane` on the result, or instead use `Reduce*` below.
 
-There are additional `{u,i}{8}` implementations on SSE4.1+ and NEON.
-
-*   `V`: `{u,i}{16,32,64},{f}` \
-    <code>V **SumOfLanes**(D, V v)</code>: returns the sum of all lanes in each
+*   <code>V **SumOfLanes**(D, V v)</code>: returns the sum of all lanes in each
     lane.
-
-*   `T`: `{u,i}{16,32,64},{f}` \
-    <code>T **ReduceSum**(D, V v)</code>: returns the sum of all lanes.
-
-*   `V`: `{u,i}{16,32,64},{f}` \
-    <code>V **MinOfLanes**(D, V v)</code>: returns the minimum-valued lane in
+*   <code>V **MinOfLanes**(D, V v)</code>: returns the minimum-valued lane in
+    each lane.
+*   <code>V **MaxOfLanes**(D, V v)</code>: returns the maximum-valued lane in
     each lane.
 
-*   `V`: `{u,i}{16,32,64},{f}` \
-    <code>V **MaxOfLanes**(D, V v)</code>: returns the maximum-valued lane in
-    each lane.
+The following are equivalent to `GetLane(SumOfLanes(d, v))` etc. but potentially
+more efficient on some targets.
+
+*   <code>T **ReduceSum**(D, V v)</code>: returns the sum of all lanes.
+*   <code>T **ReduceMin**(D, V v)</code>: returns the minimum of all lanes.
+*   <code>T **ReduceMax**(D, V v)</code>: returns the maximum of all lanes.
 
 ### Crypto
 
@@ -1903,11 +2406,6 @@ instead of `HWY_HAVE_FLOAT64`, which describes the current target.
     `#if HWY_TARGET != HWY_SCALAR || HWY_IDE` avoids code appearing greyed out.
 
 The following indicate full support for certain lane types and expand to 1 or 0.
-Note that minimal support (`Zero`, `BitCast`, `Load`/`Store`,
-`PromoteTo`/`DemoteTo`, `PromoteUpper/LowerTo`, `Combine`) is still available
-for `float16_t` and `bfloat16_t`, plus `Neg` for float16_t. Exception:
-`UpperHalf`, and thus also `PromoteUpperTo`, are not supported for the
-`HWY_SCALAR` target.
 
 *   `HWY_HAVE_INTEGER64`: support for 64-bit signed/unsigned integer lanes.
 *   `HWY_HAVE_FLOAT16`: support for 16-bit floating-point lanes.
@@ -1915,6 +2413,26 @@ for `float16_t` and `bfloat16_t`, plus `Neg` for float16_t. Exception:
 
 The above were previously known as `HWY_CAP_INTEGER64`, `HWY_CAP_FLOAT16`, and
 `HWY_CAP_FLOAT64`, respectively. Those `HWY_CAP_*` names are DEPRECATED.
+
+Even if `HWY_HAVE_FLOAT16` is 0, the following ops generally support `float16_t`
+and `bfloat16_t`:
+
+*   `Lanes`, `MaxLanes`
+*   `Zero`, `Set`, `Undefined`
+*   `BitCast`
+*   `Load`, `LoadU`, `LoadN`, `LoadNOr`, `MaskedLoad`, `MaskedLoadOr`
+*   `Store`, `StoreU`, `StoreN`, `BlendedStore`
+*   `PromoteTo`, `DemoteTo`
+*   `PromoteUpperTo`, `PromoteLowerTo`
+*   `PromoteEvenTo`, `PromoteOddTo`
+*   `Combine`, `InsertLane`, `ZeroExtendVector`
+*   `RebindMask`, `FirstN`
+*   `IfThenElse`, `IfThenElseZero`, `IfThenZeroElse`
+
+Exception: `UpperHalf`, `PromoteUpperTo`, `PromoteOddTo` and `Combine` are not
+supported for the `HWY_SCALAR` target.
+
+`Neg` also supports `float16_t` and `*Demote2To` also supports `bfloat16_t`.
 
 *   `HWY_HAVE_SCALABLE` indicates vector sizes are unknown at compile time, and
     determined by the CPU.
@@ -1939,7 +2457,7 @@ The above were previously known as `HWY_CAP_INTEGER64`, `HWY_CAP_FLOAT16`, and
 *   `HWY_IS_LITTLE_ENDIAN` expands to 1 on little-endian targets and to 0 on
     big-endian targets.
 
-*   `HWY_IS_BIG_ENDIAN` expands to 0 on big-endian targets and to 1 on
+*   `HWY_IS_BIG_ENDIAN` expands to 1 on big-endian targets and to 0 on
     little-endian targets.
 
 The following were used to signal the maximum number of lanes for certain
@@ -2002,16 +2520,18 @@ policy for selecting `HWY_TARGETS`:
     effectively disables dynamic dispatch.
 *   `HWY_COMPILE_ALL_ATTAINABLE` selects all attainable targets (i.e. enabled
     and permitted by the compiler, independently of autovectorization), which
-    maximizes coverage in tests.
+    maximizes coverage in tests. Defining `HWY_IS_TEST`, which CMake does for
+    the Highway tests, has the same effect.
+*   `HWY_SKIP_NON_BEST_BASELINE` compiles all targets at least as good as the
+    baseline. This is also the default if nothing is defined. By skipping
+    targets older than the baseline, this reduces binary size and may resolve
+    compile errors caused by conflicts between dynamic dispatch and -m flags.
 
 At most one `HWY_COMPILE_ONLY_*` may be defined. `HWY_COMPILE_ALL_ATTAINABLE`
 may also be defined even if one of `HWY_COMPILE_ONLY_*` is, but will then be
-ignored.
-
-If none are defined, but `HWY_IS_TEST` is defined, the default is
-`HWY_COMPILE_ALL_ATTAINABLE`. Otherwise, the default is to select all attainable
-targets except any non-best baseline (typically `HWY_SCALAR`), which reduces
-code size.
+ignored because the flags are tested in the order listed. As an exception,
+`HWY_SKIP_NON_BEST_BASELINE` overrides the effect of
+`HWY_COMPILE_ALL_ATTAINABLE` and `HWY_IS_TEST`.
 
 ## Compiler support
 
@@ -2030,6 +2550,12 @@ To prevent this problem, we use target-specific attributes introduced via
 `HWY_BEFORE_NAMESPACE` and `HWY_AFTER_NAMESPACE`. Alternatively, individual
 functions may be prefixed with `HWY_ATTR`, which is more verbose, but ensures
 that `#include`-d functions are not covered by target-specific attributes.
+
+WARNING: avoid non-local static objects (namespace scope 'global variables')
+between `HWY_BEFORE_NAMESPACE` and `HWY_AFTER_NAMESPACE`. We have observed
+crashes on PPC because the compiler seems to have generated an initializer using
+PPC10 code to splat a constant to all vector lanes, see #1739. To prevent this,
+you can replace static constants with a function returning the desired value.
 
 If you know the SVE vector width and are using static dispatch, you can specify
 `-march=armv9-a+sve2-aes -msve-vector-bits=128` and Highway will then use

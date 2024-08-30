@@ -1,14 +1,17 @@
-libhwy.so.1 libhwy1 #MINVER#
+libhwy.so.1 libhwy1t64 #MINVER#
  HWY_0@HWY_0 1.0.0
  _ZN3hwy11HaveFloat16Ev@HWY_0 1.0.5
  _ZN3hwy11HaveFloat64Ev@HWY_0 1.0.5
  _ZN3hwy11VectorBytesEv@HWY_0 1.0.5
+ _ZN3hwy12GetAbortFuncEv@HWY_0 1.2.0
+ _ZN3hwy12SetAbortFuncEPFvPKciS1_E@HWY_0 1.2.0
  (arch-bits=32)_ZN3hwy14AlignedDeleter18DeleteAlignedArrayEPvPFvS1_S1_ES1_PFvS1_jE@HWY_0 0.16.0
  (arch-bits=64)_ZN3hwy14AlignedDeleter18DeleteAlignedArrayEPvPFvS1_S1_ES1_PFvS1_mE@HWY_0 0.16.0
  (arch-bits=32)_ZN3hwy14DisableTargetsEx@HWY_0 1.0.0
  (arch-bits=64)_ZN3hwy14DisableTargetsEl@HWY_0 1.0.0
  _ZN3hwy14Unpredictable1Ev@HWY_0 0.16.0
  _ZN3hwy15GetChosenTargetEv@HWY_0 0.16.0
+ _ZN3hwy16DispatchedTargetEv@HWY_0 1.1.0
  _ZN3hwy16FreeAlignedBytesEPKvPFvPvS2_ES2_@HWY_0 0.16.0
  _ZN3hwy16SupportedTargetsEv@HWY_0 0.16.0
  (arch-bits=32)_ZN3hwy20AllocateAlignedBytesEjPFPvS0_jES0_@HWY_0 0.16.0
@@ -23,14 +26,69 @@ libhwy.so.1 libhwy1 #MINVER#
  (arch-bits=64)_ZN3hwy6detail8TypeNameERKNS0_8TypeInfoEmPc@HWY_0 0.16.0
  (arch-bits=32)_ZN3hwy7MeasureEPFyPKvjEPKhPKjjPNS_6ResultERKNS_6ParamsE@HWY_0 0.16.0
  (arch-bits=64)_ZN3hwy7MeasureEPFmPKvmEPKhPKmmPNS_6ResultERKNS_6ParamsE@HWY_0 0.16.0
+ _ZN3hwy8platform12GetCpuStringEPc@HWY_0 1.2.0
  _ZN3hwy8platform13HaveTimerStopEPc@HWY_0 1.0.5
  _ZN3hwy8platform15TimerResolutionEv@HWY_0 0.16.0
  _ZN3hwy8platform23InvariantTicksPerSecondEv@HWY_0 0.16.0
  _ZN3hwy8platform3NowEv@HWY_0 0.16.0
-libhwy_contrib.so.1 libhwy1 #MINVER#
+libhwy_contrib.so.1 libhwy1t64 #MINVER#
  HWY_0@HWY_0 1.0.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPNS_6K32V32EmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPNS_6K32V32EmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPNS_6K64V64EmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPNS_6K64V64EmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPNS_9float16_tEmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPNS_9float16_tEmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPNS_9uint128_tEmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPNS_9uint128_tEmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPdmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPdmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPfmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPfmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPimmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPimmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPjmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPjmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPlmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPlmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPmmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPmmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPsmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPsmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPtmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy13VQPartialSortEPtmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPNS_6K32V32EjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPNS_6K32V32EjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPNS_6K64V64EjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPNS_6K64V64EjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPNS_9float16_tEjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPNS_9float16_tEjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPNS_9uint128_tEjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPNS_9uint128_tEjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPdjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPdjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPfjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPfjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPijjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPijjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPjjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPjjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPsjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPsjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPtjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPtjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPxjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPxjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPyjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy13VQPartialSortEPyjjNS_14SortDescendingE@HWY_0 1.2.0-1
  _ZN3hwy17Fill16BytesSecureEPv@HWY_0 1.0.5
  _ZN3hwy17GetGeneratorStateEv@HWY_0 1.0.5
+ (arch-bits=64)_ZN3hwy17GetThreadAffinityERNS_10BitSet4096ILm1024EEE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy17SetThreadAffinityERKNS_10BitSet4096ILm1024EEE@HWY_0 1.2.0
+ (arch-bits=32)_ZN3hwy17GetThreadAffinityERNS_10BitSet4096ILj1024EEE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy17SetThreadAffinityERKNS_10BitSet4096ILj1024EEE@HWY_0 1.2.0-1
+ _ZN3hwy20HaveThreadingSupportEv@HWY_0 1.2.0
+ _ZN3hwy22TotalLogicalProcessorsEv@HWY_0 1.2.0
  (arch-bits=32)_ZN3hwy6Sorter11Fill24BytesEPKvjPv@HWY_0 0.16.0
  (arch-bits=64)_ZN3hwy6Sorter11Fill24BytesEPKvmPv@HWY_0 0.16.0
  _ZN3hwy6Sorter11HaveFloat64Ev@HWY_0 0.16.0
@@ -85,6 +143,56 @@ libhwy_contrib.so.1 libhwy1 #MINVER#
  (arch-bits=64)_ZN3hwy6VQSortEPtmNS_13SortAscendingE@HWY_0 1.0.5
  (arch-bits=32)_ZN3hwy6VQSortEPyjNS_14SortDescendingE@HWY_0 1.0.5
  (arch-bits=64)_ZN3hwy6VQSortEPtmNS_14SortDescendingE@HWY_0 1.0.5
+ _ZN3hwy8TopologyC1Ev@HWY_0 1.2.0
+ _ZN3hwy8TopologyC2Ev@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPNS_6K32V32EmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPNS_6K32V32EmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPNS_6K64V64EmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPNS_6K64V64EmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPNS_9float16_tEmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPNS_9float16_tEmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPNS_9uint128_tEmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPNS_9uint128_tEmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPdmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPdmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPfmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPfmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPimmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPimmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPjmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPjmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPlmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPlmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPmmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPmmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPsmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPsmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPtmmNS_13SortAscendingE@HWY_0 1.2.0
+ (arch-bits=64)_ZN3hwy8VQSelectEPtmmNS_14SortDescendingE@HWY_0 1.2.0
+ (arch-bits=32)_ZN3hwy8VQSelectEPNS_6K32V32EjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPNS_6K32V32EjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPNS_6K64V64EjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPNS_6K64V64EjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPNS_9float16_tEjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPNS_9float16_tEjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPNS_9uint128_tEjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPNS_9uint128_tEjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPdjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPdjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPfjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPfjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPijjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPijjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPjjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPjjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPsjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPsjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPtjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPtjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPxjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPxjjNS_14SortDescendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPyjjNS_13SortAscendingE@HWY_0 1.2.0-1
+ (arch-bits=32)_ZN3hwy8VQSelectEPyjjNS_14SortDescendingE@HWY_0 1.2.0-1
  _ZN3hwy9ImageBase10VectorSizeEv@HWY_0 0.16.0
  (arch-bits=32)_ZN3hwy9ImageBase11BytesPerRowEjj@HWY_0 0.16.0
  (arch-bits=32)_ZN3hwy9ImageBase17InitializePaddingEjNS0_7PaddingE@HWY_0 0.16.0
@@ -147,7 +255,7 @@ libhwy_contrib.so.1 libhwy1 #MINVER#
  (arch-bits=64)_ZNK3hwy6SorterclEPsmNS_14SortDescendingE@HWY_0 0.16.0
  (arch-bits=64)_ZNK3hwy6SorterclEPtmNS_13SortAscendingE@HWY_0 0.16.0
  (arch-bits=64)_ZNK3hwy6SorterclEPtmNS_14SortDescendingE@HWY_0 0.16.0
-libhwy_test.so.1 libhwy1 #MINVER#
+libhwy_test.so.1 libhwy1t64 #MINVER#
  HWY_0@HWY_0 1.0.0
  (arch-bits=32)_ZN3hwy10BytesEqualEPKvS1_jPj@HWY_0 0.16.0
  (arch-bits=32)_ZN3hwy6detail16AssertArrayEqualERKNS0_8TypeInfoEPKvS5_jPKcS7_i@HWY_0 0.16.0

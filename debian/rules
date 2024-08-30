@@ -17,11 +17,6 @@ ifneq (,$(filter $(DEB_HOST_ARCH), armel armhf))
   DEB_CXXFLAGS_MAINT_APPEND += -Wno-psabi
 endif
 
-ifneq (,$(filter $(DEB_HOST_ARCH), loong64))
-  # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=106322
-  DEB_CXXFLAGS_MAINT_APPEND += -fno-tree-vectorize
-endif
-
 ifeq ($(DEB_HOST_ARCH_CPU),i386)
   # https://github.com/google/highway/issues/1488
   DEB_CXXFLAGS_MAINT_APPEND += -fexcess-precision=standard
@@ -32,6 +27,10 @@ ifeq ($(DEB_HOST_ARCH),$(filter $(DEB_HOST_ARCH),armhf))
   CMAKE_EXTRA_FLAGS += -DHWY_CMAKE_ARM7:BOOL=ON
   # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=111231
   DEB_CXXFLAGS_MAINT_APPEND += -fno-tree-vectorize
+  # https://github.com/google/highway/issues/2200
+  DEB_CXXFLAGS_MAINT_APPEND += -O1
+  # Switching to O1 generate a different error than O2, prefer O0:
+  DEB_CXXFLAGS_MAINT_APPEND += -O0
 endif
 
 ifeq ($(DEB_HOST_ARCH),$(filter $(DEB_HOST_ARCH),riscv64))
@@ -84,7 +83,7 @@ override_dh_auto_build-indep:
 	# let's shrink a bit this one:
 	gs  -q -dNOPAUSE -dBATCH -dSAFER \
 		-sDEVICE=pdfwrite \
-		-dCompatibilityLevel=1.4 \
+		-dCompatibilityLevel=1.5 \
 		-dPDFSETTINGS=/screen \
 		-dEmbedAllFonts=true \
 		-dSubsetFonts=true \
