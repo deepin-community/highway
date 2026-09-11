@@ -1,3 +1,9 @@
+highway (1.0.7-9) unstable; urgency=medium
+
+  * Rebuild with LTO enabled (dpkg vendor feature optimize/lto).
+
+ -- tunaichao <tunaichao@uniontech.com>  Fri, 11 Sep 2026 15:09:59 +0800
+
 highway (1.0.7-8) unstable; urgency=medium
 
   * d/rules: Remove gcc-12 workaround
